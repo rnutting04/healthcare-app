@@ -86,9 +86,12 @@
                             <a href="/profile/" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" role="menuitem">
                                 {% trans "Profile" %}
                             </a>
-                            <a href="{% url 'logout' %}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" role="menuitem">
-                                {% trans "Sign out" %}
-                            </a>
+                            <form method="post" action="{% url 'logout' %}" class="block">
+                                {% csrf_token %}
+                                <button type="submit" class="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" role="menuitem">
+                                    {% trans "Sign out" %}
+                                </button>
+                            </form>
                         </div>
                     </div>
                 {% else %}
@@ -173,9 +176,12 @@
                         <a href="/profile/" class="block px-4 py-2 text-base font-medium text-gray-700 hover:bg-gray-100">
                             {% trans "Profile" %}
                         </a>
-                        <a href="{% url 'logout' %}" class="block px-4 py-2 text-base font-medium text-gray-700 hover:bg-gray-100">
-                            {% trans "Sign out" %}
-                        </a>
+                        <form method="post" action="{% url 'logout' %}" class="block">
+                            {% csrf_token %}
+                            <button type="submit" class="w-full text-left px-4 py-2 text-base font-medium text-gray-700 hover:bg-gray-100">
+                                {% trans "Sign out" %}
+                            </button>
+                        </form>
                     {% else %}
                         <a href="{% url 'login' %}" class="block px-4 py-2 text-base font-medium text-gray-700 hover:bg-gray-100">
                             {% trans "Sign in" %}

@@ -5,7 +5,7 @@ from django.conf.urls.static import static
 from rest_framework import permissions
 from drf_yasg.views import get_schema_view
 from drf_yasg import openapi
-from authentication.template_views import login_view, signup_view
+from authentication.template_views import login_view, signup_view, logout_view
 
 schema_view = get_schema_view(
     openapi.Info(
@@ -28,6 +28,7 @@ urlpatterns = [
     # Template views
     path('login/', login_view, name='login'),
     path('signup/', signup_view, name='signup'),
+    path('logout/', logout_view, name='logout'),
     
     # Swagger documentation
     path('swagger/', schema_view.with_ui('swagger', cache_timeout=0), name='schema-swagger-ui'),
