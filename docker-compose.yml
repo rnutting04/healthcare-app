@@ -44,7 +44,6 @@ services:
         condition: service_healthy
     volumes:
       - ./auth-service:/app
-    command: python manage.py runserver 0.0.0.0:8001
 
   patient-service:
     build:
