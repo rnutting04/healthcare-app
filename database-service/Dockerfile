@@ -21,12 +21,17 @@ ENV DJANGO_SETTINGS_MODULE=settings
 # Create static and media directories
 RUN mkdir -p static media
 
-# Run migrations
-RUN python manage.py migrate || true
-
 # Collect static files
 RUN python manage.py collectstatic --noinput || true
 
+# Install netcat and dos2unix for database connectivity check and line ending conversion
+RUN apt-get update && apt-get install -y netcat-openbsd dos2unix && rm -rf /var/lib/apt/lists/*
+
+# Copy entrypoint script and convert line endings
+COPY entrypoint.sh /entrypoint.sh
+RUN dos2unix /entrypoint.sh && chmod +x /entrypoint.sh
+
 EXPOSE 8004
 
+ENTRYPOINT ["/entrypoint.sh"]
 CMD ["gunicorn", "--bind", "0.0.0.0:8004", "--workers", "4", "--threads", "2", "wsgi:application"]

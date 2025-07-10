@@ -62,7 +62,6 @@ services:
       - auth-service
     volumes:
       - ./patient-service:/app
-    command: python manage.py runserver 0.0.0.0:8002
 
   clinician-service:
     build:
@@ -81,7 +80,6 @@ services:
       - auth-service
     volumes:
       - ./clinician-service:/app
-    command: python manage.py runserver 0.0.0.0:8003
 
   database-service:
     build:
@@ -102,7 +100,6 @@ services:
         condition: service_healthy
     volumes:
       - ./database-service:/app
-    command: python manage.py runserver 0.0.0.0:8004
 
   nginx:
     build:
@@ -121,7 +118,7 @@ services:
       - auth-static:/auth-static
 
   pgadmin:
-    image: dpage/pgadmin4:latest
+    image: dpage/pgadmin4:9.5.0
     environment:
       PGADMIN_DEFAULT_EMAIL: admin@healthcare.com
       PGADMIN_DEFAULT_PASSWORD: admin123

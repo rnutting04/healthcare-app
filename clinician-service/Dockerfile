@@ -24,6 +24,14 @@ RUN mkdir -p static media
 # Collect static files
 RUN python manage.py collectstatic --noinput || true
 
+# Install netcat and dos2unix for database connectivity check and line ending conversion
+RUN apt-get update && apt-get install -y netcat-openbsd dos2unix && rm -rf /var/lib/apt/lists/*
+
+# Copy entrypoint script and convert line endings
+COPY entrypoint.sh /entrypoint.sh
+RUN dos2unix /entrypoint.sh && chmod +x /entrypoint.sh
+
 EXPOSE 8003
 
+ENTRYPOINT ["/entrypoint.sh"]
 CMD ["gunicorn", "--bind", "0.0.0.0:8003", "--workers", "4", "--threads", "2", "wsgi:application"]

@@ -7,6 +7,7 @@ RUN apt-get update && apt-get install -y \
     gcc \
     postgresql-client \
     netcat-traditional \
+    dos2unix \
     curl \
     && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
     && apt-get install -y nodejs \
@@ -48,11 +49,11 @@ RUN ls -la static/css/
 # Collect static files
 RUN python manage.py collectstatic --noinput || true
 
-# Copy entrypoint script
-COPY entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
+# Copy entrypoint script and convert line endings
+COPY entrypoint.sh entrypoint.sh
+RUN dos2unix entrypoint.sh && chmod +x entrypoint.sh
 
 EXPOSE 8001
 
-ENTRYPOINT ["/entrypoint.sh"]
+ENTRYPOINT ["./entrypoint.sh"]
 CMD ["gunicorn", "--bind", "0.0.0.0:8001", "--workers", "4", "--threads", "2", "wsgi:application"]
