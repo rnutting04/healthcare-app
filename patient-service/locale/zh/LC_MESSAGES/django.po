@@ -1,0 +1,197 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
+# This file is distributed under the same license as the PACKAGE package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2025-07-10 05:09+0000\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+#: settings.py:102
+msgid "English"
+msgstr ""
+
+#: settings.py:103
+msgid "Arabic"
+msgstr ""
+
+#: settings.py:104
+msgid "Chinese"
+msgstr ""
+
+#: settings.py:105
+msgid "French"
+msgstr ""
+
+#: settings.py:106
+msgid "Hindi"
+msgstr ""
+
+#: settings.py:107
+msgid "Spanish"
+msgstr ""
+
+#: templates/base.html:7 templates/base.html:25 templates/base.html:101
+#: templates/patient_dashboard.html:4 templates/patient_profile_edit.html:4
+msgid "Healthcare Portal"
+msgstr "医疗门户"
+
+#: templates/base.html:31 templates/base.html:66
+msgid "Welcome,"
+msgstr "欢迎，"
+
+#: templates/base.html:37 templates/base.html:73
+#: templates/patient_profile_edit.html:4
+#: templates/patient_profile_edit.html:17
+msgid "Edit Profile"
+msgstr "编辑个人资料"
+
+#: templates/base.html:46 templates/base.html:82
+msgid "Sign Out"
+msgstr "登出"
+
+#: templates/base.html:102
+msgid "Dashboard"
+msgstr "仪表板"
+
+#: templates/base.html:103
+msgid "Appointments"
+msgstr "预约"
+
+#: templates/base.html:104
+msgid "Records"
+msgstr "记录"
+
+#: templates/base.html:105
+msgid "Prescriptions"
+msgstr "处方"
+
+#: templates/base.html:114
+msgid "Support"
+msgstr "支持"
+
+#: templates/base.html:117
+msgid "Privacy"
+msgstr "隐私"
+
+#: templates/base.html:118
+msgid "Terms"
+msgstr "条款"
+
+#: templates/patient_dashboard.html:4 templates/patient_dashboard.html:8
+msgid "Patient Dashboard"
+msgstr "患者仪表板"
+
+#: templates/patient_dashboard.html:21
+msgid "Upcoming Appointments"
+msgstr "即将到来的预约"
+
+#: templates/patient_dashboard.html:22 templates/patient_dashboard.html:42
+#: templates/patient_dashboard.html:62
+msgid "Loading..."
+msgstr "加载中..."
+
+#: templates/patient_dashboard.html:27 templates/patient_dashboard.html:47
+#: templates/patient_dashboard.html:67
+msgid "View all"
+msgstr "查看全部"
+
+#: templates/patient_dashboard.html:41
+msgid "Active Prescriptions"
+msgstr "有效处方"
+
+#: templates/patient_dashboard.html:61
+msgid "Medical Records"
+msgstr "医疗记录"
+
+#: templates/patient_dashboard.html:74
+msgid "Recent Activity"
+msgstr "最近活动"
+
+#: templates/patient_dashboard.html:78
+msgid "Loading recent activity..."
+msgstr "正在加载最近的活动..."
+
+#: templates/patient_profile_edit.html:13
+msgid "Back to Dashboard"
+msgstr "返回仪表板"
+
+#: templates/patient_profile_edit.html:25
+msgid "First Name"
+msgstr "名"
+
+#: templates/patient_profile_edit.html:27
+#: templates/patient_profile_edit.html:33
+#: templates/patient_profile_edit.html:39
+msgid "This information is managed by your account"
+msgstr "此信息由您的帐户管理"
+
+#: templates/patient_profile_edit.html:31
+msgid "Last Name"
+msgstr "姓"
+
+#: templates/patient_profile_edit.html:37
+msgid "Email"
+msgstr "电子邮件"
+
+#: templates/patient_profile_edit.html:44
+msgid "Date of Birth"
+msgstr "出生日期"
+
+#: templates/patient_profile_edit.html:49
+msgid "Gender"
+msgstr "性别"
+
+#: templates/patient_profile_edit.html:51
+msgid "Select Gender"
+msgstr "选择性别"
+
+#: templates/patient_profile_edit.html:52
+msgid "Male"
+msgstr "男"
+
+#: templates/patient_profile_edit.html:53
+msgid "Female"
+msgstr "女"
+
+#: templates/patient_profile_edit.html:54
+msgid "Other"
+msgstr "其他"
+
+#: templates/patient_profile_edit.html:59
+msgid "Phone Number"
+msgstr "电话号码"
+
+#: templates/patient_profile_edit.html:64
+msgid "Preferred Language"
+msgstr "首选语言"
+
+#: templates/patient_profile_edit.html:66
+msgid "Select Language"
+msgstr "选择语言"
+
+#: templates/patient_profile_edit.html:71
+msgid "Address"
+msgstr "地址"
+
+#: templates/patient_profile_edit.html:76
+msgid "Emergency Contact Name"
+msgstr "紧急联系人姓名"
+
+#: templates/patient_profile_edit.html:81
+msgid "Emergency Contact Phone"
+msgstr "紧急联系人电话"
+
+#: templates/patient_profile_edit.html:91
+msgid "Save Profile"
+msgstr "保存个人资料"

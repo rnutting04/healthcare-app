@@ -1,0 +1,142 @@
+services:
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: healthcare_db
+      POSTGRES_USER: healthcare_user
+      POSTGRES_PASSWORD: healthcare_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U healthcare_user -d healthcare_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  auth-service:
+    build:
+      context: ./auth-service
+      dockerfile: Dockerfile
+    ports:
+      - "8001:8001"
+    environment:
+      - DATABASE_URL=postgresql://healthcare_user:healthcare_password@postgres:5432/healthcare_db
+      - REDIS_URL=redis://redis:6379
+      - SECRET_KEY=${SECRET_KEY:-your-secret-key-here}
+      - DEBUG=${DEBUG:-True}
+      - ALLOWED_HOSTS=${ALLOWED_HOSTS:-*}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./auth-service:/app
+    command: python manage.py runserver 0.0.0.0:8001
+
+  patient-service:
+    build:
+      context: ./patient-service
+      dockerfile: Dockerfile
+    ports:
+      - "8002:8002"
+    environment:
+      - DATABASE_SERVICE_URL=http://database-service:8004
+      - AUTH_SERVICE_URL=http://auth-service:8001
+      - SECRET_KEY=${SECRET_KEY:-your-secret-key-here}
+      - DEBUG=${DEBUG:-True}
+      - ALLOWED_HOSTS=${ALLOWED_HOSTS:-*}
+    depends_on:
+      - database-service
+      - auth-service
+    volumes:
+      - ./patient-service:/app
+    command: python manage.py runserver 0.0.0.0:8002
+
+  clinician-service:
+    build:
+      context: ./clinician-service
+      dockerfile: Dockerfile
+    ports:
+      - "8003:8003"
+    environment:
+      - DATABASE_SERVICE_URL=http://database-service:8004
+      - AUTH_SERVICE_URL=http://auth-service:8001
+      - SECRET_KEY=${SECRET_KEY:-your-secret-key-here}
+      - DEBUG=${DEBUG:-True}
+      - ALLOWED_HOSTS=${ALLOWED_HOSTS:-*}
+    depends_on:
+      - database-service
+      - auth-service
+    volumes:
+      - ./clinician-service:/app
+    command: python manage.py runserver 0.0.0.0:8003
+
+  database-service:
+    build:
+      context: ./database-service
+      dockerfile: Dockerfile
+    ports:
+      - "8004:8004"
+    environment:
+      - DATABASE_URL=postgresql://healthcare_user:healthcare_password@postgres:5432/healthcare_db
+      - REDIS_URL=redis://redis:6379
+      - SECRET_KEY=${SECRET_KEY:-your-secret-key-here}
+      - DEBUG=${DEBUG:-True}
+      - ALLOWED_HOSTS=${ALLOWED_HOSTS:-*}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./database-service:/app
+    command: python manage.py runserver 0.0.0.0:8004
+
+  nginx:
+    build:
+      context: ./nginx
+      dockerfile: Dockerfile
+    ports:
+      - "80:80"
+    depends_on:
+      - auth-service
+      - patient-service
+      - clinician-service
+      - database-service
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - patient-static:/patient-static
+      - auth-static:/auth-static
+
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@healthcare.com
+      PGADMIN_DEFAULT_PASSWORD: admin123
+      PGADMIN_CONFIG_SERVER_MODE: 'False'
+      PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: 'False'
+    ports:
+      - "5050:80"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    depends_on:
+      - postgres
+
+volumes:
+  postgres_data:
+  pgadmin_data:
+  patient-static:
+  auth-static:

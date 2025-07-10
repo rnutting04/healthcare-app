@@ -1,0 +1,198 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
+# This file is distributed under the same license as the PACKAGE package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2025-07-10 05:09+0000\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=6; plural=n==0 ? 0 : n==1 ? 1 : n==2 ? 2 : n%100>=3 && n%100<=10 ? 3 : n%100>=11 && n%100<=99 ? 4 : 5;\n"
+
+#: settings.py:102
+msgid "English"
+msgstr ""
+
+#: settings.py:103
+msgid "Arabic"
+msgstr ""
+
+#: settings.py:104
+msgid "Chinese"
+msgstr ""
+
+#: settings.py:105
+msgid "French"
+msgstr ""
+
+#: settings.py:106
+msgid "Hindi"
+msgstr ""
+
+#: settings.py:107
+msgid "Spanish"
+msgstr ""
+
+#: templates/base.html:7 templates/base.html:25 templates/base.html:101
+#: templates/patient_dashboard.html:4 templates/patient_profile_edit.html:4
+msgid "Healthcare Portal"
+msgstr "بوابة الرعاية الصحية"
+
+#: templates/base.html:31 templates/base.html:66
+msgid "Welcome,"
+msgstr "مرحباً،"
+
+#: templates/base.html:37 templates/base.html:73
+#: templates/patient_profile_edit.html:4
+#: templates/patient_profile_edit.html:17
+msgid "Edit Profile"
+msgstr "تعديل الملف الشخصي"
+
+#: templates/base.html:46 templates/base.html:82
+msgid "Sign Out"
+msgstr "تسجيل الخروج"
+
+#: templates/base.html:102
+msgid "Dashboard"
+msgstr "لوحة المعلومات"
+
+#: templates/base.html:103
+msgid "Appointments"
+msgstr "المواعيد"
+
+#: templates/base.html:104
+msgid "Records"
+msgstr "السجلات"
+
+#: templates/base.html:105
+msgid "Prescriptions"
+msgstr "الوصفات الطبية"
+
+#: templates/base.html:114
+msgid "Support"
+msgstr "الدعم"
+
+#: templates/base.html:117
+msgid "Privacy"
+msgstr "الخصوصية"
+
+#: templates/base.html:118
+msgid "Terms"
+msgstr "الشروط"
+
+#: templates/patient_dashboard.html:4 templates/patient_dashboard.html:8
+msgid "Patient Dashboard"
+msgstr "لوحة معلومات المريض"
+
+#: templates/patient_dashboard.html:21
+msgid "Upcoming Appointments"
+msgstr "المواعيد القادمة"
+
+#: templates/patient_dashboard.html:22 templates/patient_dashboard.html:42
+#: templates/patient_dashboard.html:62
+msgid "Loading..."
+msgstr "جاري التحميل..."
+
+#: templates/patient_dashboard.html:27 templates/patient_dashboard.html:47
+#: templates/patient_dashboard.html:67
+msgid "View all"
+msgstr "عرض الكل"
+
+#: templates/patient_dashboard.html:41
+msgid "Active Prescriptions"
+msgstr "الوصفات النشطة"
+
+#: templates/patient_dashboard.html:61
+msgid "Medical Records"
+msgstr "السجلات الطبية"
+
+#: templates/patient_dashboard.html:74
+msgid "Recent Activity"
+msgstr "النشاط الأخير"
+
+#: templates/patient_dashboard.html:78
+msgid "Loading recent activity..."
+msgstr "جاري تحميل النشاط الأخير..."
+
+#: templates/patient_profile_edit.html:13
+msgid "Back to Dashboard"
+msgstr "العودة إلى لوحة المعلومات"
+
+#: templates/patient_profile_edit.html:25
+msgid "First Name"
+msgstr "الاسم الأول"
+
+#: templates/patient_profile_edit.html:27
+#: templates/patient_profile_edit.html:33
+#: templates/patient_profile_edit.html:39
+msgid "This information is managed by your account"
+msgstr "يتم إدارة هذه المعلومات بواسطة حسابك"
+
+#: templates/patient_profile_edit.html:31
+msgid "Last Name"
+msgstr "اسم العائلة"
+
+#: templates/patient_profile_edit.html:37
+msgid "Email"
+msgstr "البريد الإلكتروني"
+
+#: templates/patient_profile_edit.html:44
+msgid "Date of Birth"
+msgstr "تاريخ الميلاد"
+
+#: templates/patient_profile_edit.html:49
+msgid "Gender"
+msgstr "الجنس"
+
+#: templates/patient_profile_edit.html:51
+msgid "Select Gender"
+msgstr "اختر الجنس"
+
+#: templates/patient_profile_edit.html:52
+msgid "Male"
+msgstr "ذكر"
+
+#: templates/patient_profile_edit.html:53
+msgid "Female"
+msgstr "أنثى"
+
+#: templates/patient_profile_edit.html:54
+msgid "Other"
+msgstr "آخر"
+
+#: templates/patient_profile_edit.html:59
+msgid "Phone Number"
+msgstr "رقم الهاتف"
+
+#: templates/patient_profile_edit.html:64
+msgid "Preferred Language"
+msgstr "اللغة المفضلة"
+
+#: templates/patient_profile_edit.html:66
+msgid "Select Language"
+msgstr "اختر اللغة"
+
+#: templates/patient_profile_edit.html:71
+msgid "Address"
+msgstr "العنوان"
+
+#: templates/patient_profile_edit.html:76
+msgid "Emergency Contact Name"
+msgstr "اسم جهة اتصال الطوارئ"
+
+#: templates/patient_profile_edit.html:81
+msgid "Emergency Contact Phone"
+msgstr "هاتف جهة اتصال الطوارئ"
+
+#: templates/patient_profile_edit.html:91
+msgid "Save Profile"
+msgstr "احفظ التعديلات"

@@ -1,0 +1,171 @@
+{% extends "base.html" %}
+{% load i18n %}
+
+{% block title %}{% trans "Sign in" %} | {% trans "Healthcare Portal" %}{% endblock %}
+
+{% block meta_description %}{% trans "Sign in to access your secure healthcare portal" %}{% endblock %}
+
+{% block content %}
+<div class="min-h-screen flex flex-col items-center justify-center px-4 sm:px-6 lg:px-8 pt-6 pb-16">
+    <div class="animate-fade-in w-full max-w-md">
+        <!-- Header -->
+        <div class="text-center mb-10">
+            <h1 class="text-3xl font-bold text-gray-900">
+                {% trans "Welcome back" %}
+            </h1>
+            <p class="mt-2 text-sm text-gray-600">
+                {% trans "Sign in to access your secure healthcare portal" %}
+            </p>
+        </div>
+
+        <!-- Card -->
+        <div class="bg-white rounded-xl shadow-md overflow-hidden">
+            <div class="px-6 py-8">
+                <!-- Login form -->
+                <form id="loginForm" class="space-y-6">
+                    {% csrf_token %}
+
+                    <!-- Email Field -->
+                    <div>
+                        <label for="id_username" class="block text-sm font-medium text-gray-700">
+                            {% trans "Email" %}
+                        </label>
+                        <div class="mt-1">
+                            <input type="email" name="username" id="id_username" autocomplete="email" required 
+                                class="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                placeholder="{% trans 'Enter your email' %}">
+                        </div>
+                    </div>
+
+                    <!-- Password Field -->
+                    <div>
+                        <label for="id_password" class="block text-sm font-medium text-gray-700">
+                            {% trans "Password" %}
+                        </label>
+                        <div class="mt-1">
+                            <input type="password" name="password" id="id_password" autocomplete="current-password" required
+                                class="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                placeholder="{% trans 'Enter your password' %}">
+                        </div>
+                    </div>
+
+                    <!-- Remember me -->
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center">
+                            <input type="checkbox" name="remember_me" id="id_remember_me" 
+                                class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
+                            <label for="id_remember_me" class="ml-2 block text-sm text-gray-900">
+                                {% trans "Remember me" %}
+                            </label>
+                        </div>
+
+                        <div class="text-sm">
+                            <a href="#" class="font-medium text-blue-600 hover:text-blue-500">
+                                {% trans "Forgot your password?" %}
+                            </a>
+                        </div>
+                    </div>
+
+                    <!-- Error message -->
+                    <div id="error-message" class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded relative hidden" role="alert">
+                        <span class="block sm:inline"></span>
+                    </div>
+
+                    <!-- Submit Button -->
+                    <div>
+                        <button type="submit" class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                            {% trans "Sign in" %}
+                        </button>
+                    </div>
+                </form>
+
+                <!-- Divider -->
+                <div class="my-6 flex items-center">
+                    <div class="border-t border-gray-200 flex-grow"></div>
+                    <div class="mx-4 text-sm text-gray-500">{% trans "OR" %}</div>
+                    <div class="border-t border-gray-200 flex-grow"></div>
+                </div>
+
+                <!-- Sign up link -->
+                <div class="text-center">
+                    <p class="text-sm text-gray-600">
+                        {% trans "Don't have an account?" %}
+                        <a href="{% url 'signup' %}" class="font-medium text-blue-600 hover:text-blue-500">
+                            {% trans "Sign up" %}
+                        </a>
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.getElementById('loginForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        const formData = new FormData(e.target);
+        const errorDiv = document.getElementById('error-message');
+        const submitButton = e.target.querySelector('button[type="submit"]');
+        
+        // Disable submit button and show loading state
+        submitButton.disabled = true;
+        submitButton.innerHTML = '<svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-white inline" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>{% trans "Signing in..." %}';
+        
+        try {
+            const response = await fetch('/api/auth/login/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCookie('csrftoken')
+                },
+                body: JSON.stringify({
+                    email: formData.get('username'),
+                    password: formData.get('password')
+                })
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                // Store tokens
+                localStorage.setItem('access_token', data.access_token);
+                localStorage.setItem('refresh_token', data.refresh_token);
+                
+                // Show success message
+                showToast('{% trans "Login successful! Redirecting..." %}', 'success');
+                
+                // Redirect based on user role or to dashboard
+                setTimeout(() => {
+                    window.location.href = data.redirect_url || '/dashboard/';
+                }, 1000);
+            } else {
+                // Show error message
+                errorDiv.querySelector('span').textContent = data.error || '{% trans "Invalid email or password" %}';
+                errorDiv.classList.remove('hidden');
+                
+                // Re-enable submit button
+                submitButton.disabled = false;
+                submitButton.innerHTML = '{% trans "Sign in" %}';
+            }
+        } catch (error) {
+            console.error('Login error:', error);
+            errorDiv.querySelector('span').textContent = '{% trans "An error occurred. Please try again." %}';
+            errorDiv.classList.remove('hidden');
+            
+            // Re-enable submit button
+            submitButton.disabled = false;
+            submitButton.innerHTML = '{% trans "Sign in" %}';
+        }
+    });
+
+    // Hide error message when user starts typing
+    document.querySelectorAll('#loginForm input').forEach(input => {
+        input.addEventListener('input', function() {
+            document.getElementById('error-message').classList.add('hidden');
+        });
+    });
+</script>
+{% endblock %}

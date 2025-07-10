@@ -1,0 +1,133 @@
+{% extends 'base.html' %}
+
+{% block title %}Sign Up - Healthcare System{% endblock %}
+
+{% block content %}
+<div class="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+    <div class="max-w-md w-full space-y-8">
+        <div>
+            <h2 class="mt-6 text-center text-3xl font-extrabold text-gray-900">
+                Create your account
+            </h2>
+            <p class="mt-2 text-center text-sm text-gray-600">
+                Or
+                <a href="/login" class="font-medium text-blue-600 hover:text-blue-500">
+                    sign in to existing account
+                </a>
+            </p>
+        </div>
+        <form class="mt-8 space-y-6" id="signupForm">
+            <div class="space-y-4">
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label for="first_name" class="block text-sm font-medium text-gray-700">First Name</label>
+                        <input id="first_name" name="first_name" type="text" required 
+                               class="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm">
+                    </div>
+                    <div>
+                        <label for="last_name" class="block text-sm font-medium text-gray-700">Last Name</label>
+                        <input id="last_name" name="last_name" type="text" required 
+                               class="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm">
+                    </div>
+                </div>
+                
+                <div>
+                    <label for="email" class="block text-sm font-medium text-gray-700">Email Address</label>
+                    <input id="email" name="email" type="email" autocomplete="email" required 
+                           class="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm">
+                </div>
+                
+                <div>
+                    <label for="role" class="block text-sm font-medium text-gray-700">I am a</label>
+                    <select id="role" name="role" required 
+                            class="mt-1 block w-full px-3 py-2 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                        <option value="">Select your role</option>
+                        <option value="PATIENT">Patient</option>
+                        <option value="CLINICIAN">Healthcare Provider</option>
+                    </select>
+                </div>
+                
+                <div>
+                    <label for="password" class="block text-sm font-medium text-gray-700">Password</label>
+                    <input id="password" name="password" type="password" autocomplete="new-password" required 
+                           class="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm">
+                </div>
+                
+                <div>
+                    <label for="password_confirm" class="block text-sm font-medium text-gray-700">Confirm Password</label>
+                    <input id="password_confirm" name="password_confirm" type="password" autocomplete="new-password" required 
+                           class="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm">
+                </div>
+            </div>
+
+            <div id="errorMessage" class="text-red-600 text-sm text-center hidden"></div>
+
+            <div>
+                <button type="submit" 
+                        class="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                    Create Account
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+document.getElementById('signupForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    const formData = new FormData(e.target);
+    const errorDiv = document.getElementById('errorMessage');
+    
+    const data = {
+        first_name: formData.get('first_name'),
+        last_name: formData.get('last_name'),
+        email: formData.get('email'),
+        role: formData.get('role'),
+        password: formData.get('password'),
+        password_confirm: formData.get('password_confirm')
+    };
+    
+    if (data.password !== data.password_confirm) {
+        errorDiv.textContent = 'Passwords do not match';
+        errorDiv.classList.remove('hidden');
+        return;
+    }
+    
+    try {
+        const response = await fetch('/api/auth/register/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCookie('csrftoken')
+            },
+            body: JSON.stringify(data)
+        });
+        
+        const responseData = await response.json();
+        
+        if (response.ok) {
+            localStorage.setItem('access_token', responseData.access_token);
+            localStorage.setItem('refresh_token', responseData.refresh_token);
+            localStorage.setItem('user', JSON.stringify(responseData.user));
+            
+            window.location.href = responseData.redirect_url;
+        } else {
+            const errors = [];
+            for (const [field, messages] of Object.entries(responseData)) {
+                if (Array.isArray(messages)) {
+                    errors.push(`${field}: ${messages.join(', ')}`);
+                } else {
+                    errors.push(messages);
+                }
+            }
+            errorDiv.textContent = errors.join('; ');
+            errorDiv.classList.remove('hidden');
+        }
+    } catch (error) {
+        errorDiv.textContent = 'An error occurred. Please try again.';
+        errorDiv.classList.remove('hidden');
+    }
+});
+</script>
+{% endblock %}

@@ -1,0 +1,191 @@
+{% load i18n %}
+{% load static %}
+
+<style>
+    /* Hide Alpine.js elements before initialization */
+    [x-cloak] { 
+        display: none !important; 
+    }
+</style>
+
+<header class="bg-white shadow-sm">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="flex justify-between items-center h-16">
+            <!-- Logo and site name -->
+            <div class="flex items-center">
+                <a href="/" class="flex items-center space-x-3">
+                    <img src="{% static 'img/logo.svg' %}" alt="{% trans 'Healthcare Portal Logo' %}" class="h-8 w-auto">
+                    <span class="text-lg font-semibold text-gray-900">{% trans "Healthcare Portal" %}</span>
+                </a>
+            </div>
+
+            <!-- Navigation -->
+            <nav class="hidden md:flex items-center space-x-4">
+                {% if user.is_authenticated %}
+                    <!-- Dashboard link based on role -->
+                    {% if user.role == 'PATIENT' %}
+                        <a href="/patient/dashboard/" class="px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:text-blue-600 hover:bg-blue-50">
+                            {% trans "Dashboard" %}
+                        </a>
+                        <a href="/patient/appointments/" class="px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:text-blue-600 hover:bg-blue-50">
+                            {% trans "Appointments" %}
+                        </a>
+                        <a href="/patient/records/" class="px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:text-blue-600 hover:bg-blue-50">
+                            {% trans "Medical Records" %}
+                        </a>
+                    {% elif user.role == 'CLINICIAN' %}
+                        <a href="/clinician/dashboard/" class="px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:text-blue-600 hover:bg-blue-50">
+                            {% trans "Dashboard" %}
+                        </a>
+                        <a href="/clinician/patients/" class="px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:text-blue-600 hover:bg-blue-50">
+                            {% trans "Patients" %}
+                        </a>
+                        <a href="/clinician/schedule/" class="px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:text-blue-600 hover:bg-blue-50">
+                            {% trans "Schedule" %}
+                        </a>
+                    {% elif user.role == 'ADMIN' %}
+                        <a href="/admin/dashboard/" class="px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:text-blue-600 hover:bg-blue-50">
+                            {% trans "Dashboard" %}
+                        </a>
+                        <a href="/admin/users/" class="px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:text-blue-600 hover:bg-blue-50">
+                            {% trans "Users" %}
+                        </a>
+                        <a href="/admin/reports/" class="px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:text-blue-600 hover:bg-blue-50">
+                            {% trans "Reports" %}
+                        </a>
+                    {% endif %}
+
+                    <!-- User menu dropdown -->
+                    <div x-data="{ open: false }" class="ml-3 relative">
+                        <button 
+                            @click="open = !open" 
+                            type="button"
+                            class="flex items-center text-sm font-medium text-gray-700 hover:text-blue-600 focus:outline-none"
+                            id="user-menu-button"
+                            aria-expanded="false"
+                            aria-haspopup="true"
+                        >
+                            <span class="mr-2">{{ user.first_name|default:user.email }}</span>
+                            <svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                            </svg>
+                        </button>
+
+                        <!-- Dropdown menu -->
+                        <div
+                            x-show="open"
+                            x-cloak
+                            @click.away="open = false"
+                            class="origin-top-right absolute right-0 mt-2 w-48 rounded-md shadow-lg py-1 bg-white ring-1 ring-black ring-opacity-5 z-50"
+                            role="menu"
+                            aria-orientation="vertical"
+                            aria-labelledby="user-menu-button"
+                            tabindex="-1"
+                            style="display: none;"
+                        >
+                            <a href="/profile/" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" role="menuitem">
+                                {% trans "Profile" %}
+                            </a>
+                            <a href="{% url 'logout' %}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" role="menuitem">
+                                {% trans "Sign out" %}
+                            </a>
+                        </div>
+                    </div>
+                {% else %}
+                    <a href="{% url 'login' %}" class="px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:text-blue-600 hover:bg-blue-50">
+                        {% trans "Sign in" %}
+                    </a>
+                    <a href="{% url 'signup' %}" class="px-3 py-2 rounded-md text-sm font-medium bg-blue-600 text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                        {% trans "Sign up" %}
+                    </a>
+                {% endif %}
+            </nav>
+
+            <!-- Mobile menu button -->
+            <div x-data="{ open: false }" class="md:hidden flex items-center">
+                <button
+                    @click="open = !open"
+                    aria-label="{% trans 'Toggle menu' %}"
+                    class="inline-flex items-center justify-center p-2 rounded-md text-gray-700 hover:text-blue-600 hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500"
+                    aria-controls="mobile-menu"
+                    aria-expanded="false"
+                    :aria-expanded="open"
+                >
+                    <span class="sr-only">{% trans "Open main menu" %}</span>
+                    <!-- Icon when menu is closed -->
+                    <svg x-show="!open" class="block h-6 w-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+                    </svg>
+                    <!-- Icon when menu is open -->
+                    <svg x-show="open" x-cloak class="block h-6 w-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+                
+                <!-- Mobile menu -->
+                <div
+                    x-show="open"
+                    x-cloak
+                    x-transition:enter="transition ease-out duration-100 transform"
+                    x-transition:enter-start="opacity-0 scale-95"
+                    x-transition:enter-end="opacity-100 scale-100"
+                    x-transition:leave="transition ease-in duration-75 transform"
+                    x-transition:leave-start="opacity-100 scale-100"
+                    x-transition:leave-end="opacity-0 scale-95"
+                    class="absolute top-16 right-0 w-full md:hidden bg-white shadow-lg py-2 z-50"
+                    id="mobile-menu"
+                    style="display: none;"
+                >
+                    {% if user.is_authenticated %}
+                        <!-- Dashboard link based on role -->
+                        {% if user.role == 'PATIENT' %}
+                            <a href="/patient/dashboard/" class="block px-4 py-2 text-base font-medium text-gray-700 hover:bg-gray-100">
+                                {% trans "Dashboard" %}
+                            </a>
+                            <a href="/patient/appointments/" class="block px-4 py-2 text-base font-medium text-gray-700 hover:bg-gray-100">
+                                {% trans "Appointments" %}
+                            </a>
+                            <a href="/patient/records/" class="block px-4 py-2 text-base font-medium text-gray-700 hover:bg-gray-100">
+                                {% trans "Medical Records" %}
+                            </a>
+                        {% elif user.role == 'CLINICIAN' %}
+                            <a href="/clinician/dashboard/" class="block px-4 py-2 text-base font-medium text-gray-700 hover:bg-gray-100">
+                                {% trans "Dashboard" %}
+                            </a>
+                            <a href="/clinician/patients/" class="block px-4 py-2 text-base font-medium text-gray-700 hover:bg-gray-100">
+                                {% trans "Patients" %}
+                            </a>
+                            <a href="/clinician/schedule/" class="block px-4 py-2 text-base font-medium text-gray-700 hover:bg-gray-100">
+                                {% trans "Schedule" %}
+                            </a>
+                        {% elif user.role == 'ADMIN' %}
+                            <a href="/admin/dashboard/" class="block px-4 py-2 text-base font-medium text-gray-700 hover:bg-gray-100">
+                                {% trans "Dashboard" %}
+                            </a>
+                            <a href="/admin/users/" class="block px-4 py-2 text-base font-medium text-gray-700 hover:bg-gray-100">
+                                {% trans "Users" %}
+                            </a>
+                            <a href="/admin/reports/" class="block px-4 py-2 text-base font-medium text-gray-700 hover:bg-gray-100">
+                                {% trans "Reports" %}
+                            </a>
+                        {% endif %}
+
+                        <a href="/profile/" class="block px-4 py-2 text-base font-medium text-gray-700 hover:bg-gray-100">
+                            {% trans "Profile" %}
+                        </a>
+                        <a href="{% url 'logout' %}" class="block px-4 py-2 text-base font-medium text-gray-700 hover:bg-gray-100">
+                            {% trans "Sign out" %}
+                        </a>
+                    {% else %}
+                        <a href="{% url 'login' %}" class="block px-4 py-2 text-base font-medium text-gray-700 hover:bg-gray-100">
+                            {% trans "Sign in" %}
+                        </a>
+                        <a href="{% url 'signup' %}" class="block px-4 py-2 text-base font-medium text-gray-700 hover:bg-gray-100">
+                            {% trans "Sign up" %}
+                        </a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</header>

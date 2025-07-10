@@ -1,0 +1,16 @@
+{
+  "name": "auth-service-frontend",
+  "version": "1.0.0",
+  "description": "Frontend assets for healthcare auth service",
+  "scripts": {
+    "build-css": "tailwindcss -i ./static/css/input.css -o ./static/css/main.css --minify",
+    "watch-css": "tailwindcss -i ./static/css/input.css -o ./static/css/main.css --watch",
+    "build": "npm run build-css",
+    "dev": "npm run watch-css"
+  },
+  "devDependencies": {
+    "tailwindcss": "^3.3.0",
+    "autoprefixer": "^10.4.14",
+    "postcss": "^8.4.24"
+  }
+}

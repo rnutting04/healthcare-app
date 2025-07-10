@@ -1,0 +1,179 @@
+databases:
+  - name: healthcare-db
+    databaseName: healthcare_db
+    user: healthcare_user
+    plan: starter
+
+services:
+  # PostgreSQL Database is created above
+  
+  # Redis Cache
+  - type: redis
+    name: healthcare-redis
+    plan: starter
+    ipAllowList: []
+
+  # Auth Service
+  - type: web
+    name: healthcare-auth-service
+    env: python
+    plan: starter
+    buildCommand: |
+      cd auth-service &&
+      pip install -r requirements.txt &&
+      python manage.py migrate &&
+      python manage.py collectstatic --noinput
+    startCommand: |
+      cd auth-service &&
+      gunicorn auth-service.wsgi:application --bind 0.0.0.0:$PORT
+    envVars:
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DEBUG
+        value: false
+      - key: ALLOWED_HOSTS
+        value: .onrender.com,localhost
+      - key: DATABASE_URL
+        fromDatabase:
+          name: healthcare-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: healthcare-redis
+          property: connectionString
+      - key: JWT_SECRET_KEY
+        generateValue: true
+      - key: PORT
+        value: 8001
+
+  # Patient Service
+  - type: web
+    name: healthcare-patient-service
+    env: python
+    plan: starter
+    buildCommand: |
+      cd patient-service &&
+      pip install -r requirements.txt &&
+      python manage.py migrate &&
+      python manage.py collectstatic --noinput
+    startCommand: |
+      cd patient-service &&
+      gunicorn patient-service.wsgi:application --bind 0.0.0.0:$PORT
+    envVars:
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DEBUG
+        value: false
+      - key: ALLOWED_HOSTS
+        value: .onrender.com,localhost
+      - key: AUTH_SERVICE_URL
+        fromService:
+          type: web
+          name: healthcare-auth-service
+          property: host
+      - key: DATABASE_SERVICE_URL
+        fromService:
+          type: web
+          name: healthcare-database-service
+          property: host
+      - key: JWT_SECRET_KEY
+        sync: false
+      - key: PORT
+        value: 8002
+
+  # Clinician Service
+  - type: web
+    name: healthcare-clinician-service
+    env: python
+    plan: starter
+    buildCommand: |
+      cd clinician-service &&
+      pip install -r requirements.txt &&
+      python manage.py migrate &&
+      python manage.py collectstatic --noinput
+    startCommand: |
+      cd clinician-service &&
+      gunicorn clinician-service.wsgi:application --bind 0.0.0.0:$PORT
+    envVars:
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DEBUG
+        value: false
+      - key: ALLOWED_HOSTS
+        value: .onrender.com,localhost
+      - key: AUTH_SERVICE_URL
+        fromService:
+          type: web
+          name: healthcare-auth-service
+          property: host
+      - key: DATABASE_SERVICE_URL
+        fromService:
+          type: web
+          name: healthcare-database-service
+          property: host
+      - key: JWT_SECRET_KEY
+        sync: false
+      - key: PORT
+        value: 8003
+
+  # Database Service
+  - type: web
+    name: healthcare-database-service
+    env: python
+    plan: starter
+    buildCommand: |
+      cd database-service &&
+      pip install -r requirements.txt &&
+      python manage.py migrate &&
+      python manage.py collectstatic --noinput
+    startCommand: |
+      cd database-service &&
+      gunicorn database-service.wsgi:application --bind 0.0.0.0:$PORT
+    envVars:
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DEBUG
+        value: false
+      - key: ALLOWED_HOSTS
+        value: .onrender.com,localhost
+      - key: DATABASE_URL
+        fromDatabase:
+          name: healthcare-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: healthcare-redis
+          property: connectionString
+      - key: PORT
+        value: 8004
+
+  # Nginx Reverse Proxy
+  - type: web
+    name: healthcare-nginx
+    env: docker
+    plan: starter
+    dockerfilePath: ./nginx/Dockerfile
+    dockerContext: ./nginx
+    envVars:
+      - key: AUTH_SERVICE_URL
+        fromService:
+          type: web
+          name: healthcare-auth-service
+          property: host
+      - key: PATIENT_SERVICE_URL
+        fromService:
+          type: web
+          name: healthcare-patient-service
+          property: host
+      - key: CLINICIAN_SERVICE_URL
+        fromService:
+          type: web
+          name: healthcare-clinician-service
+          property: host
+      - key: DATABASE_SERVICE_URL
+        fromService:
+          type: web
+          name: healthcare-database-service
+          property: host

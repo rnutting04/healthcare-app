@@ -1,0 +1,142 @@
+{% load i18n %}
+<!DOCTYPE html>
+<html lang="{{ LANGUAGE_CODE }}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}{% trans "Healthcare Portal" %}{% endblock %}</title>
+    {% load static %}
+    {% now "U" as current_timestamp %}
+    <link href="{% static 'css/main.css' %}?v={{ current_timestamp }}" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    {% block extra_head %}{% endblock %}
+</head>
+<body class="bg-gray-50 min-h-screen flex flex-col">
+    <!-- Header -->
+    <header class="bg-white shadow-md sticky top-0 z-50">
+        <nav class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16">
+                <!-- Logo and Brand -->
+                <div class="flex items-center">
+                    <a href="/patient/dashboard" class="flex items-center">
+                        <svg class="h-8 w-8 text-blue-600 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                        </svg>
+                        <span class="text-xl font-bold text-gray-800">{% trans "Healthcare Portal" %}</span>
+                    </a>
+                </div>
+
+                <!-- Desktop Navigation -->
+                <div class="hidden md:flex items-center space-x-6">
+                    <span class="text-gray-700">{% trans "Welcome," %} <span class="font-semibold">{{ request.user_data.first_name }} {{ request.user_data.last_name }}</span></span>
+                    
+                    <a href="/patient/profile/edit" class="text-gray-600 hover:text-blue-600 transition-colors duration-200 flex items-center">
+                        <svg class="h-5 w-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
+                        </svg>
+                        {% trans "Edit Profile" %}
+                    </a>
+                    
+                    <form action="/logout" method="POST" class="inline">
+                        {% csrf_token %}
+                        <button type="submit" class="bg-red-500 hover:bg-red-600 text-white font-medium py-2 px-4 rounded-md transition-colors duration-200 flex items-center">
+                            <svg class="h-5 w-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path>
+                            </svg>
+                            {% trans "Sign Out" %}
+                        </button>
+                    </form>
+                </div>
+
+                <!-- Mobile menu button -->
+                <div class="md:hidden flex items-center">
+                    <button type="button" class="mobile-menu-button inline-flex items-center justify-center p-2 rounded-md text-gray-600 hover:text-gray-900 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500">
+                        <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path class="menu-open" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
+                            <path class="menu-close hidden" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Mobile menu -->
+            <div class="mobile-menu hidden md:hidden">
+                <div class="px-2 pt-2 pb-3 space-y-1">
+                    <div class="px-3 py-2 text-gray-700 border-b border-gray-200">
+                        {% trans "Welcome," %} <span class="font-semibold">{{ request.user_data.first_name }}</span>
+                    </div>
+                    
+                    <a href="/patient/profile/edit" class="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-100 flex items-center">
+                        <svg class="h-5 w-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
+                        </svg>
+                        {% trans "Edit Profile" %}
+                    </a>
+                    
+                    <form action="/logout" method="POST" class="block">
+                        {% csrf_token %}
+                        <button type="submit" class="w-full text-left px-3 py-2 rounded-md text-base font-medium text-red-600 hover:text-red-700 hover:bg-gray-100 flex items-center">
+                            <svg class="h-5 w-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path>
+                            </svg>
+                            {% trans "Sign Out" %}
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </nav>
+    </header>
+
+    <!-- Main Content -->
+    <main class="flex-grow">
+        {% block content %}{% endblock %}
+    </main>
+    
+    <!-- Footer -->
+    <footer class="bg-gray-800 text-white mt-auto">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+            <div class="flex flex-col md:flex-row md:items-center md:justify-between">
+                <!-- Left side - Quick Links -->
+                <div class="flex flex-wrap items-center space-x-6 text-sm">
+                    <span class="text-gray-300">&copy; 2025 {% trans "Healthcare Portal" %}</span>
+                    <a href="/patient/dashboard" class="text-gray-300 hover:text-white transition-colors">{% trans "Dashboard" %}</a>
+                    <a href="/patient/appointments" class="text-gray-300 hover:text-white transition-colors">{% trans "Appointments" %}</a>
+                    <a href="/patient/records" class="text-gray-300 hover:text-white transition-colors">{% trans "Records" %}</a>
+                    <a href="/patient/prescriptions" class="text-gray-300 hover:text-white transition-colors">{% trans "Prescriptions" %}</a>
+                </div>
+                
+                <!-- Right side - Contact -->
+                <div class="flex items-center space-x-6 mt-4 md:mt-0 text-sm">
+                    <a href="mailto:support@healthcareportal.com" class="text-gray-300 hover:text-white transition-colors flex items-center">
+                        <svg class="h-4 w-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
+                        </svg>
+                        {% trans "Support" %}
+                    </a>
+                    <span class="text-gray-500">|</span>
+                    <a href="#" class="text-gray-300 hover:text-white transition-colors">{% trans "Privacy" %}</a>
+                    <a href="#" class="text-gray-300 hover:text-white transition-colors">{% trans "Terms" %}</a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Mobile Menu Toggle Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const mobileMenuButton = document.querySelector('.mobile-menu-button');
+            const mobileMenu = document.querySelector('.mobile-menu');
+            const menuOpen = document.querySelector('.menu-open');
+            const menuClose = document.querySelector('.menu-close');
+
+            mobileMenuButton.addEventListener('click', function() {
+                mobileMenu.classList.toggle('hidden');
+                menuOpen.classList.toggle('hidden');
+                menuClose.classList.toggle('hidden');
+            });
+        });
+    </script>
+
+    {% block extra_scripts %}{% endblock %}
+</body>
+</html>

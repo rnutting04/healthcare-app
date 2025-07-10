@@ -1,0 +1,198 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
+# This file is distributed under the same license as the PACKAGE package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2025-07-10 05:09+0000\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+#: settings.py:102
+msgid "English"
+msgstr ""
+
+#: settings.py:103
+msgid "Arabic"
+msgstr ""
+
+#: settings.py:104
+msgid "Chinese"
+msgstr ""
+
+#: settings.py:105
+msgid "French"
+msgstr ""
+
+#: settings.py:106
+msgid "Hindi"
+msgstr ""
+
+#: settings.py:107
+msgid "Spanish"
+msgstr ""
+
+#: templates/base.html:7 templates/base.html:25 templates/base.html:101
+#: templates/patient_dashboard.html:4 templates/patient_profile_edit.html:4
+msgid "Healthcare Portal"
+msgstr "स्वास्थ्य पोर्टल"
+
+#: templates/base.html:31 templates/base.html:66
+msgid "Welcome,"
+msgstr "स्वागत है,"
+
+#: templates/base.html:37 templates/base.html:73
+#: templates/patient_profile_edit.html:4
+#: templates/patient_profile_edit.html:17
+msgid "Edit Profile"
+msgstr "प्रोफ़ाइल संपादित करें"
+
+#: templates/base.html:46 templates/base.html:82
+msgid "Sign Out"
+msgstr "साइन आउट"
+
+#: templates/base.html:102
+msgid "Dashboard"
+msgstr "डैशबोर्ड"
+
+#: templates/base.html:103
+msgid "Appointments"
+msgstr "नियुक्तियाँ"
+
+#: templates/base.html:104
+msgid "Records"
+msgstr "रिकॉर्ड"
+
+#: templates/base.html:105
+msgid "Prescriptions"
+msgstr "नुस्खे"
+
+#: templates/base.html:114
+msgid "Support"
+msgstr "सहायता"
+
+#: templates/base.html:117
+msgid "Privacy"
+msgstr "गोपनीयता"
+
+#: templates/base.html:118
+msgid "Terms"
+msgstr "शर्तें"
+
+#: templates/patient_dashboard.html:4 templates/patient_dashboard.html:8
+msgid "Patient Dashboard"
+msgstr "रोगी डैशबोर्ड"
+
+#: templates/patient_dashboard.html:21
+msgid "Upcoming Appointments"
+msgstr "आगामी नियुक्तियाँ"
+
+#: templates/patient_dashboard.html:22 templates/patient_dashboard.html:42
+#: templates/patient_dashboard.html:62
+msgid "Loading..."
+msgstr "लोड हो रहा है..."
+
+#: templates/patient_dashboard.html:27 templates/patient_dashboard.html:47
+#: templates/patient_dashboard.html:67
+msgid "View all"
+msgstr "सभी देखें"
+
+#: templates/patient_dashboard.html:41
+msgid "Active Prescriptions"
+msgstr "सक्रिय नुस्खे"
+
+#: templates/patient_dashboard.html:61
+msgid "Medical Records"
+msgstr "चिकित्सा रिकॉर्ड"
+
+#: templates/patient_dashboard.html:74
+msgid "Recent Activity"
+msgstr "हाल की गतिविधि"
+
+#: templates/patient_dashboard.html:78
+msgid "Loading recent activity..."
+msgstr "हाल की गतिविधि लोड हो रही है..."
+
+#: templates/patient_profile_edit.html:13
+msgid "Back to Dashboard"
+msgstr "डैशबोर्ड पर वापस जाएं"
+
+#: templates/patient_profile_edit.html:25
+msgid "First Name"
+msgstr "पहला नाम"
+
+#: templates/patient_profile_edit.html:27
+#: templates/patient_profile_edit.html:33
+#: templates/patient_profile_edit.html:39
+msgid "This information is managed by your account"
+msgstr "यह जानकारी आपके खाते द्वारा प्रबंधित की जाती है"
+
+#: templates/patient_profile_edit.html:31
+msgid "Last Name"
+msgstr "अंतिम नाम"
+
+#: templates/patient_profile_edit.html:37
+msgid "Email"
+msgstr "ईमेल"
+
+#: templates/patient_profile_edit.html:44
+msgid "Date of Birth"
+msgstr "जन्म तिथि"
+
+#: templates/patient_profile_edit.html:49
+msgid "Gender"
+msgstr "लिंग"
+
+#: templates/patient_profile_edit.html:51
+msgid "Select Gender"
+msgstr "लिंग चुनें"
+
+#: templates/patient_profile_edit.html:52
+msgid "Male"
+msgstr "पुरुष"
+
+#: templates/patient_profile_edit.html:53
+msgid "Female"
+msgstr "महिला"
+
+#: templates/patient_profile_edit.html:54
+msgid "Other"
+msgstr "अन्य"
+
+#: templates/patient_profile_edit.html:59
+msgid "Phone Number"
+msgstr "फोन नंबर"
+
+#: templates/patient_profile_edit.html:64
+msgid "Preferred Language"
+msgstr "पसंदीदा भाषा"
+
+#: templates/patient_profile_edit.html:66
+msgid "Select Language"
+msgstr "भाषा चुनें"
+
+#: templates/patient_profile_edit.html:71
+msgid "Address"
+msgstr "पता"
+
+#: templates/patient_profile_edit.html:76
+msgid "Emergency Contact Name"
+msgstr "आपातकालीन संपर्क नाम"
+
+#: templates/patient_profile_edit.html:81
+msgid "Emergency Contact Phone"
+msgstr "आपातकालीन संपर्क फोन"
+
+#: templates/patient_profile_edit.html:91
+msgid "Save Profile"
+msgstr "प्रोफ़ाइल सहेजें"

@@ -1,0 +1,243 @@
+{% load static %}
+{% load i18n %}
+<!DOCTYPE html>
+<html lang="{{ LANGUAGE_CODE|default:'en' }}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <meta name="description" content="{% block meta_description %}{% trans 'Healthcare Portal - Secure healthcare management system' %}{% endblock %}">
+
+    <title>{% block title %}{% trans 'Healthcare Portal' %}{% endblock %}</title>
+    
+    {% block extra_head %}{% endblock %}
+
+    <!-- Security headers -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; font-src 'self'; img-src 'self' data:;">
+    <meta http-equiv="X-Content-Type-Options" content="nosniff">
+    <meta http-equiv="X-Frame-Options" content="DENY">
+    <meta http-equiv="Referrer-Policy" content="strict-origin-when-cross-origin">
+
+    <!-- Favicon -->
+    <link rel="icon" href="{% static 'img/favicon.ico' %}" type="image/x-icon">
+
+    <!-- Main CSS compiled from Tailwind -->
+    <link href="{% static 'css/main.css' %}" rel="stylesheet">
+
+    <!-- HTMX -->
+    <script src="{% static 'js/htmx.min.js' %}" defer></script>
+    
+    <!-- CSRF for HTMX -->
+    {% csrf_token %}
+    <script>
+        document.body.addEventListener('htmx:configRequest', function(evt) {
+            evt.detail.headers['X-CSRFToken'] = '{{ csrf_token }}';
+        });
+    </script>
+
+    <!-- Alpine.js -->
+    <script src="{% static 'js/alpine.min.js' %}" defer></script>
+
+    <!-- Custom styles -->
+    <style>
+        /* Global styles */
+        body {
+            font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+            background-color: var(--color-background);
+            color: #1f2937;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+    </style>
+
+    {% block extra_css %}{% endblock %}
+</head>
+<body class="bg-gray-50 text-gray-900">
+    <!-- Skip to content link for accessibility -->
+    <a href="#main-content" class="sr-only focus:not-sr-only focus:absolute focus:p-3 focus:bg-white focus:text-black focus:z-50">
+        {% trans "Skip to content" %}
+    </a>
+
+    <!-- Header navigation -->
+    {% block header %}
+        {% include "partials/header.html" %}
+    {% endblock %}
+
+    <!-- Main content -->
+    <main id="main-content" class="flex-grow">
+        <!-- Page specific content -->
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- Footer -->
+    {% block footer %}
+        {% include "partials/footer.html" %}
+    {% endblock %}
+
+    <!-- Toast notifications container -->
+    <div id="toast-container" class="fixed bottom-5 right-5 z-50"></div>
+
+    <!-- Loading overlay -->
+    <div id="loading-overlay" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center hidden">
+        <div class="bg-white p-6 rounded-lg shadow-lg flex flex-col items-center">
+            <svg class="animate-spin h-10 w-10 text-blue-500 mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            <p class="text-gray-700">{% trans "Loading..." %}</p>
+        </div>
+    </div>
+
+    <!-- Base JavaScript -->
+    <script>
+        // Toast notification function
+        function showToast(message, type = 'info', duration = 5000) {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+
+            let bgColor, iconSvg;
+
+            // Set colors and icon based on type
+            switch(type) {
+                case 'success':
+                    bgColor = 'bg-green-500';
+                    iconSvg = '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>';
+                    break;
+                case 'error':
+                    bgColor = 'bg-red-500';
+                    iconSvg = '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>';
+                    break;
+                case 'warning':
+                    bgColor = 'bg-yellow-500';
+                    iconSvg = '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>';
+                    break;
+                default: // info
+                    bgColor = 'bg-blue-500';
+                    iconSvg = '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>';
+            }
+
+            // Construct toast element
+            toast.className = `${bgColor} text-white px-4 py-3 rounded-lg shadow-lg flex items-center justify-between mb-3 animate-slide-in-up`;
+            toast.innerHTML = `
+                <div class="flex items-center">
+                    <div class="mr-3">
+                        ${iconSvg}
+                    </div>
+                    <p>${message}</p>
+                </div>
+                <button class="ml-3 focus:outline-none" onclick="this.parentElement.remove()">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            `;
+
+            // Add to container
+            container.appendChild(toast);
+
+            // Auto-remove after duration
+            setTimeout(() => {
+                toast.classList.add('opacity-0', 'transition-opacity', 'duration-300');
+                setTimeout(() => toast.remove(), 300);
+            }, duration);
+        }
+
+        // Show loading overlay
+        function showLoading() {
+            document.getElementById('loading-overlay').classList.remove('hidden');
+        }
+
+        // Hide loading overlay
+        function hideLoading() {
+            document.getElementById('loading-overlay').classList.add('hidden');
+        }
+
+        // HTMX events
+        document.addEventListener('htmx:beforeRequest', function(event) {
+            // Only show loading for non-background requests
+            if (!event.detail.elt.hasAttribute('hx-indicator')) {
+                showLoading();
+            }
+        });
+
+        document.addEventListener('htmx:afterRequest', function() {
+            hideLoading();
+        });
+
+        document.addEventListener('htmx:beforeSwap', function(event) {
+            // Check for error responses
+            if (event.detail.xhr.status >= 400) {
+                // Extract error message from response if possible
+                let errorMessage;
+                try {
+                    const response = JSON.parse(event.detail.xhr.response);
+                    errorMessage = response.error || response.message || '{% trans "An error occurred" %}';
+                } catch (e) {
+                    errorMessage = '{% trans "An error occurred" %}';
+                }
+
+                showToast(errorMessage, 'error');
+
+                // Prevent swap for error responses unless they have special handling
+                if (!event.detail.elt.hasAttribute('hx-swap-error')) {
+                    event.detail.shouldSwap = false;
+                }
+            }
+        });
+
+        // Listen for custom events to show toast messages
+        document.addEventListener('showToast', function(event) {
+            const { message, type, duration } = event.detail;
+            showToast(message, type, duration);
+        });
+
+        // Cookie management functions (for JWT tokens)
+        function setCookie(name, value, days = 7) {
+            const expires = new Date(Date.now() + days * 864e5).toUTCString();
+            document.cookie = name + '=' + encodeURIComponent(value) + '; expires=' + expires + '; path=/; SameSite=Lax';
+        }
+
+        function getCookie(name) {
+            return document.cookie.split('; ').reduce((r, v) => {
+                const parts = v.split('=');
+                return parts[0] === name ? decodeURIComponent(parts[1]) : r;
+            }, '');
+        }
+
+        function deleteCookie(name) {
+            setCookie(name, '', -1);
+        }
+
+        // JWT token management
+        function getAuthHeaders() {
+            const accessToken = localStorage.getItem('access_token');
+            const headers = {
+                'Content-Type': 'application/json',
+            };
+            
+            if (accessToken) {
+                headers['Authorization'] = `Bearer ${accessToken}`;
+            }
+            
+            return headers;
+        }
+
+        // Add auth headers to all fetch requests
+        const originalFetch = window.fetch;
+        window.fetch = function(...args) {
+            if (args[1] && args[1].headers) {
+                args[1].headers = { ...getAuthHeaders(), ...args[1].headers };
+            } else if (args[1]) {
+                args[1].headers = getAuthHeaders();
+            } else {
+                args[1] = { headers: getAuthHeaders() };
+            }
+            return originalFetch.apply(this, args);
+        };
+    </script>
+
+    <!-- Page specific JavaScript -->
+    {% block extra_js %}{% endblock %}
+</body>
+</html>
