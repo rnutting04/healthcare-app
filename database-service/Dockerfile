@@ -28,8 +28,8 @@ RUN python manage.py collectstatic --noinput || true
 RUN apt-get update && apt-get install -y netcat-openbsd dos2unix && rm -rf /var/lib/apt/lists/*
 
 # Copy entrypoint script and convert line endings
-COPY entrypoint.sh /entrypoint.sh
-RUN dos2unix /entrypoint.sh && chmod +x /entrypoint.sh
+COPY --chmod=755 entrypoint.sh /entrypoint.sh
+RUN dos2unix /entrypoint.sh
 
 EXPOSE 8004
 

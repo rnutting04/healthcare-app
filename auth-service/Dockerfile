@@ -50,10 +50,10 @@ RUN ls -la static/css/
 RUN python manage.py collectstatic --noinput || true
 
 # Copy entrypoint script and convert line endings
-COPY entrypoint.sh entrypoint.sh
-RUN dos2unix entrypoint.sh && chmod +x entrypoint.sh
+COPY --chmod=755 entrypoint.sh /entrypoint.sh
+RUN dos2unix /entrypoint.sh
 
 EXPOSE 8001
 
-ENTRYPOINT ["./entrypoint.sh"]
+ENTRYPOINT ["/entrypoint.sh"]
 CMD ["gunicorn", "--bind", "0.0.0.0:8001", "--workers", "4", "--threads", "2", "wsgi:application"]
