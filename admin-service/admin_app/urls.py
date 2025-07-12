@@ -11,10 +11,6 @@ urlpatterns = [
     path('admin/cancer-types/<int:cancer_type_id>/edit/', views.cancer_type_edit, name='cancer_type_edit'),
     path('admin/cancer-types/<int:cancer_type_id>/delete/', views.cancer_type_delete, name='cancer_type_delete'),
     
-    # Cancer Subtypes
-    path('admin/cancer-subtypes/', views.cancer_subtypes_list, name='cancer_subtypes_list'),
-    path('admin/cancer-types/<int:cancer_type_id>/subtypes/', views.cancer_subtypes_list, name='cancer_subtypes_by_type'),
-    path('admin/cancer-subtypes/create/', views.cancer_subtype_create, name='cancer_subtype_create'),
     
     # User Management
     path('admin/users/', views.users_list, name='users_list'),

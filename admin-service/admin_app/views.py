@@ -26,12 +26,22 @@ def dashboard(request):
                 cancer_types_count = len(cancer_types['results'])
             elif isinstance(cancer_types, list):
                 cancer_types_count = len(cancer_types)
+            logger.info(f"Cancer types response: {cancer_types}")
         except Exception as e:
-            logger.warning(f"Could not fetch cancer types: {str(e)}")
+            logger.error(f"Could not fetch cancer types: {str(e)}")
+        
+        # Get API health status
+        api_health = {}
+        try:
+            api_health = DatabaseService.check_all_services_health()
+            logger.info(f"API health status: {api_health}")
+        except Exception as e:
+            logger.error(f"Could not fetch API health status: {str(e)}")
         
         context = {
             'stats': stats,
             'cancer_types_count': cancer_types_count,
+            'api_health': api_health,
             'user': request.user_data
         }
         return render(request, 'admin_dashboard.html', context)
@@ -45,6 +55,8 @@ def cancer_types_list(request):
     """List all cancer types"""
     try:
         response = DatabaseService.get_cancer_types()
+        logger.info(f"Cancer types response: {response}")
+        
         # The API returns the list directly, not wrapped in 'data'
         if isinstance(response, list):
             cancer_types = response
@@ -52,6 +64,8 @@ def cancer_types_list(request):
             cancer_types = response['results']
         else:
             cancer_types = []
+        
+        logger.info(f"Processed cancer types: {cancer_types}")
         
         context = {
             'cancer_types': cancer_types,
@@ -61,34 +75,57 @@ def cancer_types_list(request):
     except Exception as e:
         logger.error(f"Cancer types list error: {str(e)}")
         messages.error(request, "Error loading cancer types")
-        return render(request, 'cancer_types_list.html', {'error': str(e)})
+        return render(request, 'cancer_types_list.html', {'error': str(e), 'user': request.user_data})
 
 @require_http_methods(["GET", "POST"])
 def cancer_type_create(request):
-    """Create new cancer type"""
+    """Create new cancer type or subtype"""
     if request.method == "POST":
         try:
-            data = {
-                'cancer_type': request.POST.get('cancer_type'),
-                'description': request.POST.get('description'),
-                'parent': request.POST.get('parent') or None
-            }
+            entry_type = request.POST.get('entry_type', 'type')
             
-            DatabaseService.create_cancer_type(data)
-            messages.success(request, "Cancer type created successfully")
-            return redirect('cancer_types_list')
+            if entry_type == 'type':
+                # Create cancer type
+                data = {
+                    'cancer_type': request.POST.get('cancer_type'),
+                    'description': request.POST.get('description'),
+                    'parent': None  # Main types don't have parents
+                }
+                
+                DatabaseService.create_cancer_type(data)
+                messages.success(request, "Cancer type created successfully")
+                return redirect('cancer_types_list')
+            else:
+                # Create cancer subtype (as a CancerType with parent)
+                data = {
+                    'cancer_type': request.POST.get('subtype_cancer_type'),
+                    'description': request.POST.get('subtype_description'),
+                    'parent': request.POST.get('parent')
+                }
+                
+                DatabaseService.create_cancer_type(data)
+                messages.success(request, "Cancer subtype created successfully")
+                return redirect('cancer_types_list')
+                
         except Exception as e:
-            logger.error(f"Cancer type create error: {str(e)}")
-            messages.error(request, f"Error creating cancer type: {str(e)}")
+            logger.error(f"Cancer type/subtype create error: {str(e)}")
+            messages.error(request, f"Error creating: {str(e)}")
     
     # Get all cancer types to populate parent dropdown
     try:
         cancer_types = DatabaseService.get_cancer_types()
+        logger.info(f"Retrieved cancer types for dropdown: {cancer_types}")
         if isinstance(cancer_types, list):
-            parent_options = cancer_types
+            # Filter to only show parent types (where parent is None)
+            parent_options = [ct for ct in cancer_types if ct.get('parent') is None]
+        elif isinstance(cancer_types, dict) and 'results' in cancer_types:
+            # Filter to only show parent types (where parent is None)
+            parent_options = [ct for ct in cancer_types['results'] if ct.get('parent') is None]
         else:
             parent_options = []
-    except:
+        logger.info(f"Filtered parent options: {parent_options}")
+    except Exception as e:
+        logger.error(f"Error fetching cancer types for dropdown: {str(e)}")
         parent_options = []
     
     return render(request, 'cancer_type_form.html', {
@@ -104,6 +141,7 @@ def cancer_type_edit(request, cancer_type_id):
         response = DatabaseService.get_cancer_type(cancer_type_id)
         # The API returns the object directly, not wrapped in 'data'
         cancer_type = response
+        logger.info(f"Editing cancer type {cancer_type_id}: {cancer_type}")
         
         if request.method == "POST":
             data = {
@@ -116,9 +154,22 @@ def cancer_type_edit(request, cancer_type_id):
             messages.success(request, "Cancer type updated successfully")
             return redirect('cancer_types_list')
         
+        # Get all cancer types to populate parent dropdown
+        try:
+            all_cancer_types = DatabaseService.get_cancer_types()
+            if isinstance(all_cancer_types, list):
+                parent_options = [ct for ct in all_cancer_types if ct.get('id') != cancer_type_id]
+            elif isinstance(all_cancer_types, dict) and 'results' in all_cancer_types:
+                parent_options = [ct for ct in all_cancer_types['results'] if ct.get('id') != cancer_type_id]
+            else:
+                parent_options = []
+        except:
+            parent_options = []
+        
         return render(request, 'cancer_type_form.html', {
             'action': 'edit',
             'cancer_type': cancer_type,
+            'parent_options': parent_options,
             'user': request.user_data
         })
     except Exception as e:
@@ -138,61 +189,7 @@ def cancer_type_delete(request, cancer_type_id):
     
     return redirect('cancer_types_list')
 
-# Cancer Subtype Views
-def cancer_subtypes_list(request, cancer_type_id=None):
-    """List cancer subtypes"""
-    try:
-        response = DatabaseService.get_cancer_subtypes(cancer_type_id)
-        subtypes = response.get('data', [])
-        
-        cancer_type = None
-        if cancer_type_id:
-            cancer_type_response = DatabaseService.get_cancer_type(cancer_type_id)
-            cancer_type = cancer_type_response.get('data')
-        
-        context = {
-            'subtypes': subtypes,
-            'cancer_type': cancer_type,
-            'user': request.user_data
-        }
-        return render(request, 'cancer_subtypes_list.html', context)
-    except Exception as e:
-        logger.error(f"Cancer subtypes list error: {str(e)}")
-        messages.error(request, "Error loading cancer subtypes")
-        return render(request, 'cancer_subtypes_list.html', {'error': str(e)})
 
-@require_http_methods(["GET", "POST"])
-def cancer_subtype_create(request):
-    """Create new cancer subtype"""
-    try:
-        # Get all cancer types for dropdown
-        cancer_types_response = DatabaseService.get_cancer_types()
-        cancer_types = cancer_types_response.get('data', [])
-        
-        if request.method == "POST":
-            data = {
-                'cancer_type_id': request.POST.get('cancer_type_id'),
-                'name': request.POST.get('name'),
-                'code': request.POST.get('code'),
-                'description': request.POST.get('description'),
-                'characteristics': request.POST.get('characteristics', ''),
-                'treatment_notes': request.POST.get('treatment_notes', ''),
-                'created_by': request.user_data.get('user_id')
-            }
-            
-            DatabaseService.create_cancer_subtype(data)
-            messages.success(request, "Cancer subtype created successfully")
-            return redirect('cancer_subtypes_list')
-        
-        return render(request, 'cancer_subtype_form.html', {
-            'action': 'create',
-            'cancer_types': cancer_types,
-            'user': request.user_data
-        })
-    except Exception as e:
-        logger.error(f"Cancer subtype create error: {str(e)}")
-        messages.error(request, f"Error creating cancer subtype: {str(e)}")
-        return redirect('cancer_subtypes_list')
 
 # User Management Views
 def users_list(request):

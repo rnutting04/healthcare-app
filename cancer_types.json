@@ -1,0 +1,609 @@
+{
+    "count": 36,
+    "next": null,
+    "previous": null,
+    "results": [
+        {
+            "id": 32,
+            "cancer_type": "Adenosarcoma",
+            "description": "Biphasic lesion with benign M\u00fcllerian epithelium and a malignant, usually low-grade stromal component; when \u226525 % of the mass is high-grade sarcoma (\u201csarcomatous overgrowth\u201d) behaviour becomes markedly more aggressive.",
+            "parent": 11,
+            "parent_details": {
+                "id": 11,
+                "cancer_type": "Uterine Cancer"
+            },
+            "subtypes": [],
+            "created_at": "2025-07-12T23:06:42.844677Z",
+            "updated_at": "2025-07-12T23:06:42.844690Z"
+        },
+        {
+            "id": 13,
+            "cancer_type": "Bladder Cancer",
+            "description": "Begins in the lining of the bladder (urothelium). Can cause blood in the urine and is strongly associated with smoking.",
+            "parent": null,
+            "parent_details": null,
+            "subtypes": [],
+            "created_at": "2025-07-12T22:20:43.760173Z",
+            "updated_at": "2025-07-12T22:20:43.760183Z"
+        },
+        {
+            "id": 18,
+            "cancer_type": "Bone Cancer",
+            "description": "Primary bone cancers (like osteosarcoma or Ewing sarcoma) are rare and mostly affect children or young adults. Bone can also be a site of metastasis.",
+            "parent": null,
+            "parent_details": null,
+            "subtypes": [],
+            "created_at": "2025-07-12T22:22:54.633860Z",
+            "updated_at": "2025-07-12T22:22:54.633871Z"
+        },
+        {
+            "id": 15,
+            "cancer_type": "Brain Cancer",
+            "description": "Tumors like glioblastoma or meningioma originate in the brain. Symptoms depend on location (e.g., seizures, headaches, behavior changes).",
+            "parent": null,
+            "parent_details": null,
+            "subtypes": [],
+            "created_at": "2025-07-12T22:21:01.877924Z",
+            "updated_at": "2025-07-12T22:21:01.877934Z"
+        },
+        {
+            "id": 1,
+            "cancer_type": "Breast Cancer",
+            "description": "Cancer that forms in the cells of the breast, most often in the ducts or lobules. Common in women but can occur in men. Subtypes depend on hormone receptor status (e.g., ER+, HER2+).",
+            "parent": null,
+            "parent_details": null,
+            "subtypes": [
+                {
+                    "id": 2,
+                    "cancer_type": "Invasive Ductal Carcinoma",
+                    "description": "Most common type of breast cancer",
+                    "parent": 1,
+                    "parent_details": {
+                        "id": 1,
+                        "cancer_type": "Breast Cancer"
+                    },
+                    "subtypes": [],
+                    "created_at": "2025-07-12T04:50:31.660463Z",
+                    "updated_at": "2025-07-12T04:50:31.660483Z"
+                }
+            ],
+            "created_at": "2025-07-12T04:50:08.846773Z",
+            "updated_at": "2025-07-12T22:17:13.005765Z"
+        },
+        {
+            "id": 27,
+            "cancer_type": "Carcinosarcoma (malignant mixed M\u00fcllerian tumor)",
+            "description": "A metaplastic carcinoma that contains both carcinomatous and sarcomatous elements; staged as a high-grade endometrial cancer and noted for frequent metastasis even when seemingly early-stage",
+            "parent": 11,
+            "parent_details": {
+                "id": 11,
+                "cancer_type": "Uterine Cancer"
+            },
+            "subtypes": [],
+            "created_at": "2025-07-12T23:05:00.768184Z",
+            "updated_at": "2025-07-12T23:05:00.768198Z"
+        },
+        {
+            "id": 10,
+            "cancer_type": "Cervical Cancer",
+            "description": "Occurs in the cervix, primarily due to persistent infection with high-risk human papillomavirus (HPV). Preventable with vaccines and screening (Pap test).",
+            "parent": null,
+            "parent_details": null,
+            "subtypes": [],
+            "created_at": "2025-07-12T22:20:10.631988Z",
+            "updated_at": "2025-07-12T22:20:10.632001Z"
+        },
+        {
+            "id": 25,
+            "cancer_type": "Clear-cell carcinoma",
+            "description": "Another high-risk non-endometrioid variant that behaves aggressively and is managed like serous carcinoma with multimodality therapy",
+            "parent": 11,
+            "parent_details": {
+                "id": 11,
+                "cancer_type": "Uterine Cancer"
+            },
+            "subtypes": [],
+            "created_at": "2025-07-12T23:03:55.694311Z",
+            "updated_at": "2025-07-12T23:03:55.694325Z"
+        },
+        {
+            "id": 6,
+            "cancer_type": "Colorectal Cancer",
+            "description": "Begins in the colon or rectum, often from precancerous polyps. Highly preventable and treatable if caught early through screening like colonoscopy.",
+            "parent": null,
+            "parent_details": null,
+            "subtypes": [],
+            "created_at": "2025-07-12T22:19:01.064087Z",
+            "updated_at": "2025-07-12T22:19:01.064111Z"
+        },
+        {
+            "id": 23,
+            "cancer_type": "Endometrioid carcinoma",
+            "description": "Most common uterine malignancy; usually presents as an adenocarcinoma confined to the endometrium and is often caught at an early (stage I) point where surgery alone may cure the disease.",
+            "parent": 11,
+            "parent_details": {
+                "id": 11,
+                "cancer_type": "Uterine Cancer"
+            },
+            "subtypes": [],
+            "created_at": "2025-07-12T22:29:32.196116Z",
+            "updated_at": "2025-07-12T22:29:32.196131Z"
+        },
+        {
+            "id": 17,
+            "cancer_type": "Esophageal Cancer",
+            "description": "Occurs in the tube connecting throat to stomach. Can be squamous cell (upper) or adenocarcinoma (lower), often tied to smoking or acid reflux.",
+            "parent": null,
+            "parent_details": null,
+            "subtypes": [],
+            "created_at": "2025-07-12T22:21:31.135205Z",
+            "updated_at": "2025-07-12T22:21:31.135218Z"
+        },
+        {
+            "id": 29,
+            "cancer_type": "High-grade endometrial stromal sarcoma (HG-ESS)",
+            "description": "Defined by YWHAE-NUTM2, ZC3H7B-BCOR or BCOR-ITD alterations; shows high-grade round or spindle cells, \u226510 mitoses/10 HPF and a more aggressive clinical course than LG-ESS.",
+            "parent": 11,
+            "parent_details": {
+                "id": 11,
+                "cancer_type": "Uterine Cancer"
+            },
+            "subtypes": [],
+            "created_at": "2025-07-12T23:05:43.551200Z",
+            "updated_at": "2025-07-12T23:05:43.551212Z"
+        },
+        {
+            "id": 2,
+            "cancer_type": "Invasive Ductal Carcinoma",
+            "description": "Most common type of breast cancer",
+            "parent": 1,
+            "parent_details": {
+                "id": 1,
+                "cancer_type": "Breast Cancer"
+            },
+            "subtypes": [],
+            "created_at": "2025-07-12T04:50:31.660463Z",
+            "updated_at": "2025-07-12T04:50:31.660483Z"
+        },
+        {
+            "id": 12,
+            "cancer_type": "Kidney Cancer",
+            "description": "Most commonly renal-cell carcinoma. Originates in the kidney tubules. Often detected incidentally during imaging for other reasons.",
+            "parent": null,
+            "parent_details": null,
+            "subtypes": [],
+            "created_at": "2025-07-12T22:20:31.024330Z",
+            "updated_at": "2025-07-12T22:20:31.024340Z"
+        },
+        {
+            "id": 31,
+            "cancer_type": "Leiomyosarcoma (uLMS)",
+            "description": "Malignant smooth-muscle tumor\u2014usually spindle-cell but myxoid or epithelioid variants occur; expresses desmin/SMA and behaves aggressively even when apparently localized.",
+            "parent": 11,
+            "parent_details": {
+                "id": 11,
+                "cancer_type": "Uterine Cancer"
+            },
+            "subtypes": [],
+            "created_at": "2025-07-12T23:06:21.627099Z",
+            "updated_at": "2025-07-12T23:06:21.627111Z"
+        },
+        {
+            "id": 21,
+            "cancer_type": "Leukemia",
+            "description": "A group of cancers affecting the bone marrow and blood. Includes acute and chronic forms, both lymphoid and myeloid.",
+            "parent": null,
+            "parent_details": null,
+            "subtypes": [],
+            "created_at": "2025-07-12T22:23:45.809276Z",
+            "updated_at": "2025-07-12T22:23:45.809291Z"
+        },
+        {
+            "id": 7,
+            "cancer_type": "Liver Cancer",
+            "description": "Most commonly hepatocellular carcinoma, often developing in people with hepatitis or cirrhosis. Can also arise from bile ducts (cholangiocarcinoma).",
+            "parent": null,
+            "parent_details": null,
+            "subtypes": [],
+            "created_at": "2025-07-12T22:19:16.424996Z",
+            "updated_at": "2025-07-12T22:19:16.425011Z"
+        },
+        {
+            "id": 28,
+            "cancer_type": "Low-grade endometrial stromal sarcoma (LG-ESS)",
+            "description": "Cytologically bland spindle-cell tumor that mimics proliferative endometrial stroma; characteristically infiltrates the myometrium in \u201cfinger-like\u201d tongues and often carries a JAZF1-SUZ12 or related fusion; prognosis is largely stage-dependent.",
+            "parent": 11,
+            "parent_details": {
+                "id": 11,
+                "cancer_type": "Uterine Cancer"
+            },
+            "subtypes": [],
+            "created_at": "2025-07-12T23:05:21.764453Z",
+            "updated_at": "2025-07-12T23:05:21.764470Z"
+        },
+        {
+            "id": 3,
+            "cancer_type": "Lung Cancer",
+            "description": "Originates in lung tissue, typically in the bronchi. Divided into non-small-cell (more common, slower) and small-cell (aggressive, fast-spreading).",
+            "parent": null,
+            "parent_details": null,
+            "subtypes": [],
+            "created_at": "2025-07-12T22:17:49.953061Z",
+            "updated_at": "2025-07-12T22:17:49.953074Z"
+        },
+        {
+            "id": 22,
+            "cancer_type": "Lymphoma",
+            "description": "Cancer of the lymphatic system. Two main types: Hodgkin lymphoma and non-Hodgkin lymphoma. Can occur anywhere lymph nodes are present.",
+            "parent": null,
+            "parent_details": null,
+            "subtypes": [],
+            "created_at": "2025-07-12T22:23:59.223338Z",
+            "updated_at": "2025-07-12T22:23:59.223351Z"
+        },
+        {
+            "id": 36,
+            "cancer_type": "NTRK-rearranged spindle-cell sarcoma",
+            "description": "Newly recognised entity with NTRK1/2/3 fusions; typically stage I at presentation and may respond to TRK inhibitors on recurrence.",
+            "parent": 11,
+            "parent_details": {
+                "id": 11,
+                "cancer_type": "Uterine Cancer"
+            },
+            "subtypes": [],
+            "created_at": "2025-07-12T23:07:54.783624Z",
+            "updated_at": "2025-07-12T23:07:54.783634Z"
+        },
+        {
+            "id": 9,
+            "cancer_type": "Ovarian Cancer",
+            "description": "Starts in or on the ovaries. Usually detected late due to vague abdominal symptoms. Epithelial ovarian cancer is the most common form.",
+            "parent": null,
+            "parent_details": null,
+            "subtypes": [],
+            "created_at": "2025-07-12T22:19:54.663430Z",
+            "updated_at": "2025-07-12T22:19:54.663444Z"
+        },
+        {
+            "id": 5,
+            "cancer_type": "Pancreatic Cancer",
+            "description": "Usually starts in the ducts of the pancreas (pancreatic adenocarcinoma). Known for late diagnosis and rapid progression; symptoms are often vague.",
+            "parent": null,
+            "parent_details": null,
+            "subtypes": [],
+            "created_at": "2025-07-12T22:18:28.679252Z",
+            "updated_at": "2025-07-12T22:18:28.679263Z"
+        },
+        {
+            "id": 33,
+            "cancer_type": "Perivascular epithelioid-cell tumor (PEComa)",
+            "description": "Rare mesenchymal tumor listed among \u201cother sarcomas\u201d; included by NCCN because it requires sarcoma-type management",
+            "parent": 11,
+            "parent_details": {
+                "id": 11,
+                "cancer_type": "Uterine Cancer"
+            },
+            "subtypes": [],
+            "created_at": "2025-07-12T23:07:10.535804Z",
+            "updated_at": "2025-07-12T23:07:10.535817Z"
+        },
+        {
+            "id": 4,
+            "cancer_type": "Prostate Cancer",
+            "description": "Affects the prostate gland in men. Often grows slowly and may not cause symptoms for years. PSA blood test is used for screening.",
+            "parent": null,
+            "parent_details": null,
+            "subtypes": [],
+            "created_at": "2025-07-12T22:18:13.383249Z",
+            "updated_at": "2025-07-12T22:18:13.383261Z"
+        },
+        {
+            "id": 35,
+            "cancer_type": "Rhabdomyosarcoma (RMS)",
+            "description": "Embryonal, alveolar or pleomorphic skeletal-muscle\u2013type sarcoma; embryonal tumors often carry DICER1 mutations and have a better outlook than alveolar/pleomorphic variants.",
+            "parent": 11,
+            "parent_details": {
+                "id": 11,
+                "cancer_type": "Uterine Cancer"
+            },
+            "subtypes": [],
+            "created_at": "2025-07-12T23:07:39.337391Z",
+            "updated_at": "2025-07-12T23:07:39.337407Z"
+        },
+        {
+            "id": 24,
+            "cancer_type": "Serous carcinoma",
+            "description": "One of the \u201chigh-risk\u201d histologies\u2014biologically aggressive with a high rate of extra-uterine spread at diagnosis; patterns of recurrence resemble ovarian cancer .",
+            "parent": 11,
+            "parent_details": {
+                "id": 11,
+                "cancer_type": "Uterine Cancer"
+            },
+            "subtypes": [],
+            "created_at": "2025-07-12T23:03:34.327363Z",
+            "updated_at": "2025-07-12T23:03:34.327377Z"
+        },
+        {
+            "id": 14,
+            "cancer_type": "Skin Cancer",
+            "description": "Includes basal cell carcinoma, squamous cell carcinoma, and melanoma. Melanoma is the most dangerous and can spread quickly if not caught early.",
+            "parent": null,
+            "parent_details": null,
+            "subtypes": [],
+            "created_at": "2025-07-12T22:20:54.028327Z",
+            "updated_at": "2025-07-12T22:20:54.028337Z"
+        },
+        {
+            "id": 8,
+            "cancer_type": "Stomach Cancer",
+            "description": "Develops in the lining of the stomach, often associated with H. pylori infection and diets high in smoked or salty foods.",
+            "parent": null,
+            "parent_details": null,
+            "subtypes": [],
+            "created_at": "2025-07-12T22:19:43.093418Z",
+            "updated_at": "2025-07-12T22:19:43.093428Z"
+        },
+        {
+            "id": 20,
+            "cancer_type": "Testicular Cancer",
+            "description": "Most common in younger men. Germ cell tumors like seminomas are usually curable with surgery and chemotherapy.",
+            "parent": null,
+            "parent_details": null,
+            "subtypes": [],
+            "created_at": "2025-07-12T22:23:31.097080Z",
+            "updated_at": "2025-07-12T22:23:31.097091Z"
+        },
+        {
+            "id": 16,
+            "cancer_type": "Throat Cancer",
+            "description": "Affects parts of the throat and voice box. Often linked to smoking, alcohol, and HPV infection.",
+            "parent": null,
+            "parent_details": null,
+            "subtypes": [],
+            "created_at": "2025-07-12T22:21:22.252018Z",
+            "updated_at": "2025-07-12T22:21:22.252032Z"
+        },
+        {
+            "id": 19,
+            "cancer_type": "Thyroid Cancer",
+            "description": "Usually slow-growing cancers like papillary thyroid carcinoma. Often found as a lump in the neck and treated effectively with surgery and radioactive iodine.",
+            "parent": null,
+            "parent_details": null,
+            "subtypes": [],
+            "created_at": "2025-07-12T22:23:12.836827Z",
+            "updated_at": "2025-07-12T22:23:12.836848Z"
+        },
+        {
+            "id": 34,
+            "cancer_type": "UTROSCT (uterine tumor resembling ovarian sex-cord tumor)",
+            "description": "Spindle-cell proliferation with sex-cord differentiation; harbours ESR1 or GREB1 fusions; most have uncertain malignant potential, but ~25 % behave aggressively.",
+            "parent": 11,
+            "parent_details": {
+                "id": 11,
+                "cancer_type": "Uterine Cancer"
+            },
+            "subtypes": [],
+            "created_at": "2025-07-12T23:07:24.312461Z",
+            "updated_at": "2025-07-12T23:07:24.312473Z"
+        },
+        {
+            "id": 26,
+            "cancer_type": "Undifferentiated / dedifferentiated carcinoma",
+            "description": "Highly aggressive tumors lacking obvious gland formation; grouped with other high-risk variants because of their propensity for distant disease",
+            "parent": 11,
+            "parent_details": {
+                "id": 11,
+                "cancer_type": "Uterine Cancer"
+            },
+            "subtypes": [],
+            "created_at": "2025-07-12T23:04:28.855778Z",
+            "updated_at": "2025-07-12T23:04:28.855805Z"
+        },
+        {
+            "id": 30,
+            "cancer_type": "Undifferentiated uterine sarcoma (UUS)",
+            "description": "Diagnosis of exclusion for highly aggressive pleomorphic spindle/epithelioid tumors that lack specific ESS or smooth-muscle markers; some cases are SMARCA4-deficient and extremely aggressive.",
+            "parent": 11,
+            "parent_details": {
+                "id": 11,
+                "cancer_type": "Uterine Cancer"
+            },
+            "subtypes": [],
+            "created_at": "2025-07-12T23:06:05.806292Z",
+            "updated_at": "2025-07-12T23:06:05.806304Z"
+        },
+        {
+            "id": 11,
+            "cancer_type": "Uterine Cancer",
+            "description": "Arises from the inner lining of the uterus. Common in postmenopausal women and often presents with abnormal vaginal bleeding.",
+            "parent": null,
+            "parent_details": null,
+            "subtypes": [
+                {
+                    "id": 23,
+                    "cancer_type": "Endometrioid carcinoma",
+                    "description": "Most common uterine malignancy; usually presents as an adenocarcinoma confined to the endometrium and is often caught at an early (stage I) point where surgery alone may cure the disease.",
+                    "parent": 11,
+                    "parent_details": {
+                        "id": 11,
+                        "cancer_type": "Uterine Cancer"
+                    },
+                    "subtypes": [],
+                    "created_at": "2025-07-12T22:29:32.196116Z",
+                    "updated_at": "2025-07-12T22:29:32.196131Z"
+                },
+                {
+                    "id": 24,
+                    "cancer_type": "Serous carcinoma",
+                    "description": "One of the \u201chigh-risk\u201d histologies\u2014biologically aggressive with a high rate of extra-uterine spread at diagnosis; patterns of recurrence resemble ovarian cancer .",
+                    "parent": 11,
+                    "parent_details": {
+                        "id": 11,
+                        "cancer_type": "Uterine Cancer"
+                    },
+                    "subtypes": [],
+                    "created_at": "2025-07-12T23:03:34.327363Z",
+                    "updated_at": "2025-07-12T23:03:34.327377Z"
+                },
+                {
+                    "id": 25,
+                    "cancer_type": "Clear-cell carcinoma",
+                    "description": "Another high-risk non-endometrioid variant that behaves aggressively and is managed like serous carcinoma with multimodality therapy",
+                    "parent": 11,
+                    "parent_details": {
+                        "id": 11,
+                        "cancer_type": "Uterine Cancer"
+                    },
+                    "subtypes": [],
+                    "created_at": "2025-07-12T23:03:55.694311Z",
+                    "updated_at": "2025-07-12T23:03:55.694325Z"
+                },
+                {
+                    "id": 26,
+                    "cancer_type": "Undifferentiated / dedifferentiated carcinoma",
+                    "description": "Highly aggressive tumors lacking obvious gland formation; grouped with other high-risk variants because of their propensity for distant disease",
+                    "parent": 11,
+                    "parent_details": {
+                        "id": 11,
+                        "cancer_type": "Uterine Cancer"
+                    },
+                    "subtypes": [],
+                    "created_at": "2025-07-12T23:04:28.855778Z",
+                    "updated_at": "2025-07-12T23:04:28.855805Z"
+                },
+                {
+                    "id": 27,
+                    "cancer_type": "Carcinosarcoma (malignant mixed M\u00fcllerian tumor)",
+                    "description": "A metaplastic carcinoma that contains both carcinomatous and sarcomatous elements; staged as a high-grade endometrial cancer and noted for frequent metastasis even when seemingly early-stage",
+                    "parent": 11,
+                    "parent_details": {
+                        "id": 11,
+                        "cancer_type": "Uterine Cancer"
+                    },
+                    "subtypes": [],
+                    "created_at": "2025-07-12T23:05:00.768184Z",
+                    "updated_at": "2025-07-12T23:05:00.768198Z"
+                },
+                {
+                    "id": 28,
+                    "cancer_type": "Low-grade endometrial stromal sarcoma (LG-ESS)",
+                    "description": "Cytologically bland spindle-cell tumor that mimics proliferative endometrial stroma; characteristically infiltrates the myometrium in \u201cfinger-like\u201d tongues and often carries a JAZF1-SUZ12 or related fusion; prognosis is largely stage-dependent.",
+                    "parent": 11,
+                    "parent_details": {
+                        "id": 11,
+                        "cancer_type": "Uterine Cancer"
+                    },
+                    "subtypes": [],
+                    "created_at": "2025-07-12T23:05:21.764453Z",
+                    "updated_at": "2025-07-12T23:05:21.764470Z"
+                },
+                {
+                    "id": 29,
+                    "cancer_type": "High-grade endometrial stromal sarcoma (HG-ESS)",
+                    "description": "Defined by YWHAE-NUTM2, ZC3H7B-BCOR or BCOR-ITD alterations; shows high-grade round or spindle cells, \u226510 mitoses/10 HPF and a more aggressive clinical course than LG-ESS.",
+                    "parent": 11,
+                    "parent_details": {
+                        "id": 11,
+                        "cancer_type": "Uterine Cancer"
+                    },
+                    "subtypes": [],
+                    "created_at": "2025-07-12T23:05:43.551200Z",
+                    "updated_at": "2025-07-12T23:05:43.551212Z"
+                },
+                {
+                    "id": 30,
+                    "cancer_type": "Undifferentiated uterine sarcoma (UUS)",
+                    "description": "Diagnosis of exclusion for highly aggressive pleomorphic spindle/epithelioid tumors that lack specific ESS or smooth-muscle markers; some cases are SMARCA4-deficient and extremely aggressive.",
+                    "parent": 11,
+                    "parent_details": {
+                        "id": 11,
+                        "cancer_type": "Uterine Cancer"
+                    },
+                    "subtypes": [],
+                    "created_at": "2025-07-12T23:06:05.806292Z",
+                    "updated_at": "2025-07-12T23:06:05.806304Z"
+                },
+                {
+                    "id": 31,
+                    "cancer_type": "Leiomyosarcoma (uLMS)",
+                    "description": "Malignant smooth-muscle tumor\u2014usually spindle-cell but myxoid or epithelioid variants occur; expresses desmin/SMA and behaves aggressively even when apparently localized.",
+                    "parent": 11,
+                    "parent_details": {
+                        "id": 11,
+                        "cancer_type": "Uterine Cancer"
+                    },
+                    "subtypes": [],
+                    "created_at": "2025-07-12T23:06:21.627099Z",
+                    "updated_at": "2025-07-12T23:06:21.627111Z"
+                },
+                {
+                    "id": 32,
+                    "cancer_type": "Adenosarcoma",
+                    "description": "Biphasic lesion with benign M\u00fcllerian epithelium and a malignant, usually low-grade stromal component; when \u226525 % of the mass is high-grade sarcoma (\u201csarcomatous overgrowth\u201d) behaviour becomes markedly more aggressive.",
+                    "parent": 11,
+                    "parent_details": {
+                        "id": 11,
+                        "cancer_type": "Uterine Cancer"
+                    },
+                    "subtypes": [],
+                    "created_at": "2025-07-12T23:06:42.844677Z",
+                    "updated_at": "2025-07-12T23:06:42.844690Z"
+                },
+                {
+                    "id": 33,
+                    "cancer_type": "Perivascular epithelioid-cell tumor (PEComa)",
+                    "description": "Rare mesenchymal tumor listed among \u201cother sarcomas\u201d; included by NCCN because it requires sarcoma-type management",
+                    "parent": 11,
+                    "parent_details": {
+                        "id": 11,
+                        "cancer_type": "Uterine Cancer"
+                    },
+                    "subtypes": [],
+                    "created_at": "2025-07-12T23:07:10.535804Z",
+                    "updated_at": "2025-07-12T23:07:10.535817Z"
+                },
+                {
+                    "id": 34,
+                    "cancer_type": "UTROSCT (uterine tumor resembling ovarian sex-cord tumor)",
+                    "description": "Spindle-cell proliferation with sex-cord differentiation; harbours ESR1 or GREB1 fusions; most have uncertain malignant potential, but ~25 % behave aggressively.",
+                    "parent": 11,
+                    "parent_details": {
+                        "id": 11,
+                        "cancer_type": "Uterine Cancer"
+                    },
+                    "subtypes": [],
+                    "created_at": "2025-07-12T23:07:24.312461Z",
+                    "updated_at": "2025-07-12T23:07:24.312473Z"
+                },
+                {
+                    "id": 35,
+                    "cancer_type": "Rhabdomyosarcoma (RMS)",
+                    "description": "Embryonal, alveolar or pleomorphic skeletal-muscle\u2013type sarcoma; embryonal tumors often carry DICER1 mutations and have a better outlook than alveolar/pleomorphic variants.",
+                    "parent": 11,
+                    "parent_details": {
+                        "id": 11,
+                        "cancer_type": "Uterine Cancer"
+                    },
+                    "subtypes": [],
+                    "created_at": "2025-07-12T23:07:39.337391Z",
+                    "updated_at": "2025-07-12T23:07:39.337407Z"
+                },
+                {
+                    "id": 36,
+                    "cancer_type": "NTRK-rearranged spindle-cell sarcoma",
+                    "description": "Newly recognised entity with NTRK1/2/3 fusions; typically stage I at presentation and may respond to TRK inhibitors on recurrence.",
+                    "parent": 11,
+                    "parent_details": {
+                        "id": 11,
+                        "cancer_type": "Uterine Cancer"
+                    },
+                    "subtypes": [],
+                    "created_at": "2025-07-12T23:07:54.783624Z",
+                    "updated_at": "2025-07-12T23:07:54.783634Z"
+                }
+            ],
+            "created_at": "2025-07-12T22:20:25.114585Z",
+            "updated_at": "2025-07-12T22:20:25.114596Z"
+        }
+    ]
+}

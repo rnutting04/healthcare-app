@@ -84,7 +84,7 @@
         <div class="mt-6 pt-6 border-t border-gray-200">
             <h3 class="text-lg font-semibold text-gray-900 mb-4">Patient Information</h3>
             {% if patient_data %}
-            <form id="patient-info-form" method="POST" action="/admin/patients/{{ patient_data.id }}/update">
+            <form id="patient-info-form" method="POST" action="/admin/patients/{{ patient_data.id }}/update/">
                 {% csrf_token %}
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>

@@ -1,6 +1,7 @@
 import requests
 from django.conf import settings
 import logging
+from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
@@ -35,27 +36,27 @@ class DatabaseService:
     @staticmethod
     def get_cancer_types():
         """Get all cancer types"""
-        return DatabaseService.make_request('GET', '/api/db/cancer-types/')
+        return DatabaseService.make_request('GET', '/api/cancer-types/')
     
     @staticmethod
     def get_cancer_type(cancer_type_id):
         """Get specific cancer type"""
-        return DatabaseService.make_request('GET', f'/api/db/cancer-types/{cancer_type_id}/')
+        return DatabaseService.make_request('GET', f'/api/cancer-types/{cancer_type_id}/')
     
     @staticmethod
     def create_cancer_type(data):
         """Create new cancer type"""
-        return DatabaseService.make_request('POST', '/api/db/cancer-types/', data=data)
+        return DatabaseService.make_request('POST', '/api/cancer-types/', data=data)
     
     @staticmethod
     def update_cancer_type(cancer_type_id, data):
         """Update cancer type"""
-        return DatabaseService.make_request('PUT', f'/api/db/cancer-types/{cancer_type_id}/', data=data)
+        return DatabaseService.make_request('PUT', f'/api/cancer-types/{cancer_type_id}/', data=data)
     
     @staticmethod
     def delete_cancer_type(cancer_type_id):
         """Delete cancer type"""
-        return DatabaseService.make_request('DELETE', f'/api/db/cancer-types/{cancer_type_id}/')
+        return DatabaseService.make_request('DELETE', f'/api/cancer-types/{cancer_type_id}/')
     
     # Cancer Subtype Management
     @staticmethod
@@ -120,3 +121,58 @@ class DatabaseService:
     def update_patient(patient_id, data):
         """Update patient information"""
         return DatabaseService.make_request('PATCH', f'/api/patients/{patient_id}/', data=data)
+    
+    @staticmethod
+    def check_all_services_health():
+        """Check health status of all microservices"""
+        services = {
+            'auth-service': settings.AUTH_SERVICE_URL,
+            'patient-service': settings.PATIENT_SERVICE_URL,
+            'clinician-service': settings.CLINICIAN_SERVICE_URL,
+            'database-service': settings.DATABASE_SERVICE_URL,
+            'admin-service': 'http://admin-service:8005'  # Self check
+        }
+        
+        health_status = {}
+        
+        for service_name, service_url in services.items():
+            try:
+                start_time = datetime.now()
+                response = requests.get(
+                    f"{service_url}/health/",
+                    timeout=5
+                )
+                response_time = (datetime.now() - start_time).total_seconds() * 1000  # Convert to milliseconds
+                
+                if response.status_code == 200:
+                    health_status[service_name] = {
+                        'status': 'healthy',
+                        'response_time': round(response_time, 2),
+                        'details': response.json() if response.text else {}
+                    }
+                else:
+                    health_status[service_name] = {
+                        'status': 'unhealthy',
+                        'response_time': round(response_time, 2),
+                        'error': f'HTTP {response.status_code}'
+                    }
+            except requests.exceptions.Timeout:
+                health_status[service_name] = {
+                    'status': 'timeout',
+                    'response_time': 5000,
+                    'error': 'Request timed out'
+                }
+            except requests.exceptions.ConnectionError:
+                health_status[service_name] = {
+                    'status': 'down',
+                    'response_time': 0,
+                    'error': 'Connection refused'
+                }
+            except Exception as e:
+                health_status[service_name] = {
+                    'status': 'error',
+                    'response_time': 0,
+                    'error': str(e)
+                }
+        
+        return health_status

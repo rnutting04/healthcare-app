@@ -110,6 +110,8 @@ services:
     environment:
       - DATABASE_SERVICE_URL=http://database-service:8004
       - AUTH_SERVICE_URL=http://auth-service:8001
+      - PATIENT_SERVICE_URL=http://patient-service:8002
+      - CLINICIAN_SERVICE_URL=http://clinician-service:8003
       - SECRET_KEY=${SECRET_KEY:-your-secret-key-here}
       - DEBUG=${DEBUG:-True}
       - ALLOWED_HOSTS=${ALLOWED_HOSTS:-*}

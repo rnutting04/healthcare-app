@@ -6,13 +6,27 @@ import requests
 @ensure_csrf_cookie
 def login_view(request):
     if request.user.is_authenticated:
-        return redirect(f'/{request.user.role.name.lower()}/dashboard')
+        # Get role from user object (set by middleware)
+        role = getattr(request.user, 'role_name', 'PATIENT').lower()
+        if role == 'admin':
+            return redirect('/admin/dashboard/')
+        elif role == 'clinician':
+            return redirect('/clinician/dashboard/')
+        else:
+            return redirect('/patient/dashboard/')
     return render(request, 'login.html')
 
 @ensure_csrf_cookie
 def signup_view(request):
     if request.user.is_authenticated:
-        return redirect(f'/{request.user.role.lower()}/dashboard')
+        # Get role from user object (set by middleware)
+        role = getattr(request.user, 'role_name', 'PATIENT').lower()
+        if role == 'admin':
+            return redirect('/admin/dashboard/')
+        elif role == 'clinician':
+            return redirect('/clinician/dashboard/')
+        else:
+            return redirect('/patient/dashboard/')
     return render(request, 'signup.html')
 
 @require_POST

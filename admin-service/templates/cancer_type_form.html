@@ -1,93 +1,130 @@
 {% extends 'base.html' %}
+{% load static %}
 
-{% block title %}{% if action == 'create' %}Add{% else %}Edit{% endif %} Cancer Type - Healthcare Portal{% endblock %}
+{% block title %}{% if action == 'edit' %}Edit{% else %}Add{% endif %} Cancer Type - Healthcare Portal{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'css/cancer-type-form.css' %}">
+{% endblock %}
 
 {% block content %}
 <div class="max-w-4xl mx-auto space-y-6">
     <!-- Page Header -->
     <div class="bg-white shadow rounded-lg p-6">
-        <h1 class="text-2xl font-bold text-gray-900">{% if action == 'create' %}Add New{% else %}Edit{% endif %} Cancer Type</h1>
-        <p class="mt-1 text-sm text-gray-600">{% if action == 'create' %}Create a new cancer type in the system{% else %}Update cancer type information{% endif %}</p>
+        <h1 class="text-2xl font-bold text-gray-900">{% if action == 'edit' %}Edit Cancer Type{% else %}Add Cancer Type or Subtype{% endif %}</h1>
+        <p class="mt-1 text-sm text-gray-600">{% if action == 'edit' %}Update cancer type information{% else %}Create a new cancer type or subtype in the system{% endif %}</p>
     </div>
 
     <!-- Form -->
-    <form method="POST" class="bg-white shadow rounded-lg p-6">
+    <form method="POST" class="bg-white shadow rounded-lg p-6" data-action="{{ action }}">
         {% csrf_token %}
         
         <div class="space-y-6">
-            <!-- Name -->
+            {% if action == 'create' %}
+            <!-- Type Selection -->
             <div>
-                <label for="name" class="block text-sm font-medium text-gray-700">Cancer Type Name</label>
-                <input type="text" name="name" id="name" required 
-                       value="{% if cancer_type %}{{ cancer_type.name }}{% endif %}"
-                       class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
-                       placeholder="e.g., Breast Cancer">
+                <label class="block text-sm font-medium text-gray-700 mb-3">What would you like to add?</label>
+                <div class="grid grid-cols-2 gap-4">
+                    <label class="relative flex cursor-pointer rounded-lg border bg-white p-4 shadow-sm focus:outline-none border-gray-300">
+                        <input type="radio" name="entry_type" value="type" class="sr-only" checked onchange="toggleFormFields()">
+                        <div class="flex flex-1">
+                            <div class="flex flex-col">
+                                <span class="block text-sm font-medium text-gray-900">Cancer Type</span>
+                                <span class="mt-1 flex items-center text-sm text-gray-500">A main category of cancer</span>
+                            </div>
+                        </div>
+                        <svg class="h-5 w-5 text-blue-600 hidden type-radio-selected" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+                        </svg>
+                        <div class="absolute -inset-px rounded-lg border-2 pointer-events-none border-transparent"></div>
+                    </label>
+                    
+                    <label class="relative flex cursor-pointer rounded-lg border bg-white p-4 shadow-sm focus:outline-none border-gray-300">
+                        <input type="radio" name="entry_type" value="subtype" class="sr-only" onchange="toggleFormFields()">
+                        <div class="flex flex-1">
+                            <div class="flex flex-col">
+                                <span class="block text-sm font-medium text-gray-900">Cancer Subtype</span>
+                                <span class="mt-1 flex items-center text-sm text-gray-500">A specific variant of a cancer type</span>
+                            </div>
+                        </div>
+                        <svg class="h-5 w-5 text-blue-600 hidden subtype-radio-selected" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+                        </svg>
+                        <div class="absolute -inset-px rounded-lg border-2 pointer-events-none border-transparent"></div>
+                    </label>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Common Fields -->
+            <div id="type-fields">
+                <!-- Cancer Type Name -->
+                <div class="space-y-6">
+                    <div>
+                        <label for="cancer_type" class="block text-sm font-medium text-gray-700">Cancer Type Name</label>
+                        <input type="text" name="cancer_type" id="cancer_type" 
+                               class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                               placeholder="e.g., Breast Cancer, Lung Cancer"
+                               value="{% if cancer_type %}{{ cancer_type.cancer_type }}{% endif %}">
+                    </div>
+
+                    <!-- Description -->
+                    <div>
+                        <label for="description" class="block text-sm font-medium text-gray-700">Description</label>
+                        <textarea name="description" id="description" rows="4"
+                                  class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                                  placeholder="Provide a brief description of this cancer type">{% if cancer_type %}{{ cancer_type.description }}{% endif %}</textarea>
+                    </div>
+                </div>
             </div>
 
-            <!-- Code -->
-            <div>
-                <label for="code" class="block text-sm font-medium text-gray-700">Code</label>
-                <input type="text" name="code" id="code" required 
-                       value="{% if cancer_type %}{{ cancer_type.code }}{% endif %}"
-                       class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
-                       placeholder="e.g., BRCA"
-                       style="text-transform: uppercase;">
-                <p class="mt-1 text-sm text-gray-500">A unique code to identify this cancer type</p>
-            </div>
+            <!-- Subtype Fields -->
+            <div id="subtype-fields" style="display: none;">
+                <div class="space-y-6">
+                    <!-- Parent Cancer Type Selection -->
+                    <div>
+                        <label for="parent" class="block text-sm font-medium text-gray-700">Parent Cancer Type</label>
+                        <select name="parent" id="parent" 
+                                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
+                            <option value="">Select a parent cancer type</option>
+                            {% for parent_type in parent_options %}
+                                <option value="{{ parent_type.id }}">{{ parent_type.cancer_type }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
 
-            <!-- Description -->
-            <div>
-                <label for="description" class="block text-sm font-medium text-gray-700">Description</label>
-                <textarea name="description" id="description" rows="4" required
-                          class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
-                          placeholder="Provide a brief description of this cancer type">{% if cancer_type %}{{ cancer_type.description }}{% endif %}</textarea>
-            </div>
+                    <!-- Subtype Name -->
+                    <div>
+                        <label for="subtype_cancer_type" class="block text-sm font-medium text-gray-700">Subtype Name</label>
+                        <input type="text" name="subtype_cancer_type" id="subtype_cancer_type" 
+                               class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                               placeholder="e.g., Triple-negative breast cancer">
+                    </div>
 
-            <!-- Symptoms -->
-            <div>
-                <label for="symptoms" class="block text-sm font-medium text-gray-700">Common Symptoms</label>
-                <textarea name="symptoms" id="symptoms" rows="3"
-                          class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
-                          placeholder="List common symptoms (optional)">{% if cancer_type %}{{ cancer_type.symptoms }}{% endif %}</textarea>
-            </div>
-
-            <!-- Risk Factors -->
-            <div>
-                <label for="risk_factors" class="block text-sm font-medium text-gray-700">Risk Factors</label>
-                <textarea name="risk_factors" id="risk_factors" rows="3"
-                          class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
-                          placeholder="List risk factors (optional)">{% if cancer_type %}{{ cancer_type.risk_factors }}{% endif %}</textarea>
+                    <!-- Subtype Description -->
+                    <div>
+                        <label for="subtype_description" class="block text-sm font-medium text-gray-700">Description</label>
+                        <textarea name="subtype_description" id="subtype_description" rows="4"
+                                  class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                                  placeholder="Provide a description of this cancer subtype"></textarea>
+                    </div>
+                </div>
             </div>
         </div>
 
         <!-- Form Actions -->
         <div class="mt-6 flex items-center justify-end space-x-3">
-            <a href="/admin/cancer-types" class="bg-gray-200 hover:bg-gray-300 text-gray-700 font-medium py-2 px-4 rounded-md transition-colors">
+            <a href="/admin/dashboard" class="bg-gray-200 hover:bg-gray-300 text-gray-700 font-medium py-2 px-4 rounded-md transition-colors">
                 Cancel
             </a>
             <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-md transition-colors">
-                {% if action == 'create' %}Create Cancer Type{% else %}Update Cancer Type{% endif %}
+                {% if action == 'edit' %}Update{% else %}Create{% endif %}
             </button>
         </div>
     </form>
 </div>
+{% endblock %}
 
-<style>
-    input[type="text"],
-    input[type="email"],
-    textarea,
-    select {
-        border: 1px solid #d1d5db;
-        padding: 0.5rem 0.75rem;
-    }
-    
-    input[type="text"]:focus,
-    input[type="email"]:focus,
-    textarea:focus,
-    select:focus {
-        outline: none;
-        border-color: #3b82f6;
-        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
-    }
-</style>
+{% block extra_scripts %}
+<script src="{% static 'js/cancer-type-form.js' %}"></script>
 {% endblock %}

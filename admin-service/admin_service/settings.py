@@ -32,6 +32,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -93,11 +94,15 @@ USE_I18N = True
 USE_TZ = True
 
 # Static files (CSS, JavaScript, Images)
-STATIC_URL = '/static/'
+STATIC_URL = '/admin/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 STATICFILES_DIRS = [
     BASE_DIR / 'static',
 ]
+
+# WhiteNoise configuration
+WHITENOISE_AUTOREFRESH = True
+WHITENOISE_USE_FINDERS = True
 
 # Default primary key field type
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
@@ -119,6 +124,7 @@ CORS_ALLOW_CREDENTIALS = True
 # Service URLs
 DATABASE_SERVICE_URL = config('DATABASE_SERVICE_URL', default='http://database-service:8004')
 PATIENT_SERVICE_URL = config('PATIENT_SERVICE_URL', default='http://patient-service:8002')
+CLINICIAN_SERVICE_URL = config('CLINICIAN_SERVICE_URL', default='http://clinician-service:8003')
 AUTH_SERVICE_URL = config('AUTH_SERVICE_URL', default='http://auth-service:8001')
 
 # JWT Configuration
