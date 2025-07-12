@@ -1,22 +1,44 @@
 from django.db import models
-from django.contrib.auth.models import AbstractUser
+from django.contrib.auth.models import AbstractBaseUser, BaseUserManager
 from django.utils import timezone
 
-class User(AbstractUser):
-    ROLE_CHOICES = [
-        ('PATIENT', 'Patient'),
-        ('CLINICIAN', 'Clinician'),
-        ('ADMIN', 'Administrator'),
-    ]
+class Role(models.Model):
+    name = models.CharField(max_length=20, unique=True)
+    display_name = models.CharField(max_length=50)
+    description = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
     
+    class Meta:
+        db_table = 'roles'
+        verbose_name = 'Role'
+        verbose_name_plural = 'Roles'
+    
+    def __str__(self):
+        return self.display_name
+
+class UserManager(BaseUserManager):
+    def create_user(self, email, password=None, **extra_fields):
+        if not email:
+            raise ValueError('The Email field must be set')
+        email = self.normalize_email(email)
+        user = self.model(email=email, **extra_fields)
+        user.set_password(password)
+        user.save(using=self._db)
+        return user
+
+class User(AbstractBaseUser):
     email = models.EmailField(unique=True)
-    role = models.CharField(max_length=20, choices=ROLE_CHOICES)
-    phone_number = models.CharField(max_length=20, blank=True)
-    date_of_birth = models.DateField(null=True, blank=True)
-    address = models.TextField(blank=True)
+    first_name = models.CharField(max_length=150)
+    last_name = models.CharField(max_length=150)
+    role = models.ForeignKey(Role, on_delete=models.PROTECT, related_name='users')
+    is_active = models.BooleanField(default=True)
+    date_joined = models.DateTimeField(default=timezone.now)
+    last_login = models.DateTimeField(null=True, blank=True)
+    
+    objects = UserManager()
     
     USERNAME_FIELD = 'email'
-    REQUIRED_FIELDS = ['username', 'first_name', 'last_name', 'role']
+    REQUIRED_FIELDS = ['first_name', 'last_name']
     
     class Meta:
         db_table = 'users'
@@ -24,20 +46,25 @@ class User(AbstractUser):
             models.Index(fields=['email']),
             models.Index(fields=['role']),
         ]
+    
+    def __str__(self):
+        return f"{self.email}"
 
 class Patient(models.Model):
-    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='patient_profile')
+    # This should match the patient-service model structure
+    user_id = models.IntegerField(unique=True, db_index=True)
+    date_of_birth = models.DateField()
     gender = models.CharField(max_length=10, choices=[
         ('MALE', 'Male'),
         ('FEMALE', 'Female'),
         ('OTHER', 'Other')
     ])
+    phone_number = models.CharField(max_length=20)
+    address = models.TextField()
     emergency_contact_name = models.CharField(max_length=255)
     emergency_contact_phone = models.CharField(max_length=20)
-    blood_type = models.CharField(max_length=5, blank=True)
-    allergies = models.TextField(blank=True)
-    medical_conditions = models.TextField(blank=True)
-    created_at = models.DateTimeField(auto_now_add=True)
+    preferred_language_id = models.CharField(max_length=10, null=True, blank=True)
+    created_at = models.DateTimeField()
     updated_at = models.DateTimeField(auto_now=True)
     
     class Meta:
@@ -140,6 +167,31 @@ class Prescription(models.Model):
             models.Index(fields=['is_active']),
             models.Index(fields=['patient', 'is_active']),
         ]
+
+class CancerType(models.Model):
+    cancer_type = models.CharField(max_length=200)
+    description = models.TextField(blank=True)
+    parent = models.ForeignKey(
+        'self', 
+        on_delete=models.CASCADE, 
+        null=True, 
+        blank=True, 
+        related_name='subtypes'
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        db_table = 'cancer_types'
+        indexes = [
+            models.Index(fields=['cancer_type']),
+            models.Index(fields=['parent']),
+        ]
+        
+    def __str__(self):
+        if self.parent:
+            return f"{self.parent.cancer_type} - {self.cancer_type}"
+        return self.cancer_type
 
 class EventLog(models.Model):
     event_type = models.CharField(max_length=100)

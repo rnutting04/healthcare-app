@@ -110,9 +110,23 @@
         const errorDiv = document.getElementById('error-message');
         const submitButton = e.target.querySelector('button[type="submit"]');
         
+        // Get the 'next' parameter from URL if it exists
+        const urlParams = new URLSearchParams(window.location.search);
+        const nextUrl = urlParams.get('next');
+        
         // Disable submit button and show loading state
         submitButton.disabled = true;
         submitButton.innerHTML = '<svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-white inline" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>{% trans "Signing in..." %}';
+        
+        const loginData = {
+            email: formData.get('username'),
+            password: formData.get('password')
+        };
+        
+        // Include 'next' parameter if it exists
+        if (nextUrl) {
+            loginData.next = nextUrl;
+        }
         
         try {
             const response = await fetch('/api/auth/login/', {
@@ -121,10 +135,7 @@
                     'Content-Type': 'application/json',
                     'X-CSRFToken': getCookie('csrftoken')
                 },
-                body: JSON.stringify({
-                    email: formData.get('username'),
-                    password: formData.get('password')
-                })
+                body: JSON.stringify(loginData)
             });
 
             const data = await response.json();

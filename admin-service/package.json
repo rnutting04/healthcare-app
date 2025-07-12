@@ -1,0 +1,14 @@
+{
+  "name": "admin-service",
+  "version": "1.0.0",
+  "description": "Admin service for healthcare microservices",
+  "scripts": {
+    "build-css": "tailwindcss -i ./static/src/input.css -o ./static/css/main.css --minify",
+    "watch-css": "tailwindcss -i ./static/src/input.css -o ./static/css/main.css --watch"
+  },
+  "devDependencies": {
+    "tailwindcss": "^3.4.16",
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.4.49"
+  }
+}

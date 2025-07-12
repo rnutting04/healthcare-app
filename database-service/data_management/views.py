@@ -6,11 +6,11 @@ from django.conf import settings
 from django.db.models import Q
 from django.utils import timezone
 from datetime import datetime, timedelta
-from .models import User, Patient, Clinician, Appointment, MedicalRecord, Prescription, EventLog
+from .models import User, Patient, Clinician, Appointment, MedicalRecord, Prescription, EventLog, CancerType
 from .serializers import (
     UserSerializer, PatientSerializer, ClinicianSerializer,
     AppointmentSerializer, MedicalRecordSerializer, PrescriptionSerializer,
-    EventLogSerializer, MedicalRecordCreateSerializer
+    EventLogSerializer, MedicalRecordCreateSerializer, CancerTypeSerializer
 )
 
 class UserViewSet(viewsets.ModelViewSet):
@@ -20,9 +20,41 @@ class UserViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         queryset = super().get_queryset()
         role = self.request.query_params.get('role')
+        is_active = self.request.query_params.get('is_active')
+        
         if role:
-            queryset = queryset.filter(role=role)
-        return queryset
+            queryset = queryset.filter(role__name=role)
+        
+        if is_active is not None:
+            queryset = queryset.filter(is_active=is_active.lower() == 'true')
+            
+        return queryset.select_related('role')
+    
+    @action(detail=False, methods=['get'])
+    def statistics(self, request):
+        """Get user statistics for admin dashboard"""
+        from django.utils import timezone
+        from datetime import timedelta
+        
+        # Get counts by role
+        total_users = User.objects.count()
+        active_patients = User.objects.filter(role__name='PATIENT', is_active=True).count()
+        active_clinicians = User.objects.filter(role__name='CLINICIAN', is_active=True).count()
+        total_admins = User.objects.filter(role__name='ADMIN').count()
+        inactive_users = User.objects.filter(is_active=False).count()
+        
+        # Get new users in last 7 days
+        week_ago = timezone.now() - timedelta(days=7)
+        new_users_week = User.objects.filter(date_joined__gte=week_ago).count()
+        
+        return Response({
+            'total_users': total_users,
+            'active_patients': active_patients,
+            'active_clinicians': active_clinicians,
+            'total_admins': total_admins,
+            'inactive_users': inactive_users,
+            'new_users_week': new_users_week
+        })
     
     @action(detail=False, methods=['get'])
     def by_email(self, request):
@@ -45,7 +77,7 @@ class UserViewSet(viewsets.ModelViewSet):
             return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
 
 class PatientViewSet(viewsets.ModelViewSet):
-    queryset = Patient.objects.select_related('user').all()
+    queryset = Patient.objects.all()
     serializer_class = PatientSerializer
     
     @action(detail=False, methods=['get'])
@@ -82,7 +114,7 @@ class ClinicianViewSet(viewsets.ModelViewSet):
         return Response(serializer.data)
 
 class AppointmentViewSet(viewsets.ModelViewSet):
-    queryset = Appointment.objects.select_related('patient__user', 'clinician__user').all()
+    queryset = Appointment.objects.select_related('patient', 'clinician__user').all()
     serializer_class = AppointmentSerializer
     
     def get_queryset(self):
@@ -142,7 +174,7 @@ class AppointmentViewSet(viewsets.ModelViewSet):
         return Response(serializer.data)
 
 class MedicalRecordViewSet(viewsets.ModelViewSet):
-    queryset = MedicalRecord.objects.select_related('patient__user', 'clinician__user', 'appointment').all()
+    queryset = MedicalRecord.objects.select_related('patient', 'clinician__user', 'appointment').all()
     serializer_class = MedicalRecordSerializer
     
     def get_queryset(self):
@@ -189,7 +221,7 @@ class MedicalRecordViewSet(viewsets.ModelViewSet):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 class PrescriptionViewSet(viewsets.ModelViewSet):
-    queryset = Prescription.objects.select_related('patient__user', 'clinician__user', 'medical_record').all()
+    queryset = Prescription.objects.select_related('patient', 'clinician__user', 'medical_record').all()
     serializer_class = PrescriptionSerializer
     
     def get_queryset(self):
@@ -256,3 +288,42 @@ def statistics(request):
     
     cache.set(cache_key, stats, 3600)  # Cache for 1 hour
     return Response(stats)
+
+class CancerTypeViewSet(viewsets.ModelViewSet):
+    queryset = CancerType.objects.all()
+    serializer_class = CancerTypeSerializer
+    
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        
+        # Filter by parent (to get only top-level types or subtypes)
+        parent_id = self.request.query_params.get('parent_id')
+        if parent_id:
+            if parent_id == 'null':
+                # Get only top-level cancer types
+                queryset = queryset.filter(parent__isnull=True)
+            else:
+                # Get subtypes of a specific parent
+                queryset = queryset.filter(parent_id=parent_id)
+        
+        # Search by cancer type name
+        search = self.request.query_params.get('search')
+        if search:
+            queryset = queryset.filter(cancer_type__icontains=search)
+        
+        return queryset.order_by('cancer_type')
+    
+    @action(detail=False, methods=['get'])
+    def top_level(self, request):
+        """Get only top-level cancer types (no parent)"""
+        cancer_types = self.queryset.filter(parent__isnull=True).order_by('cancer_type')
+        serializer = self.get_serializer(cancer_types, many=True)
+        return Response(serializer.data)
+    
+    @action(detail=True, methods=['get'])
+    def subtypes(self, request, pk=None):
+        """Get all subtypes of a specific cancer type"""
+        cancer_type = self.get_object()
+        subtypes = cancer_type.subtypes.all().order_by('cancer_type')
+        serializer = self.get_serializer(subtypes, many=True)
+        return Response(serializer.data)

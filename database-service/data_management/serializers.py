@@ -1,16 +1,22 @@
 from rest_framework import serializers
-from .models import User, Patient, Clinician, Appointment, MedicalRecord, Prescription, EventLog
+from .models import User, Role, Patient, Clinician, Appointment, MedicalRecord, Prescription, EventLog, CancerType
+
+class RoleSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Role
+        fields = ['id', 'name', 'display_name', 'description']
 
 class UserSerializer(serializers.ModelSerializer):
+    role_detail = RoleSerializer(source='role', read_only=True)
+    role_name = serializers.CharField(source='role.name', read_only=True)
+    
     class Meta:
         model = User
-        fields = ['id', 'email', 'first_name', 'last_name', 'role', 'phone_number', 
-                 'date_of_birth', 'address', 'is_active', 'date_joined']
-        read_only_fields = ['id', 'date_joined']
+        fields = ['id', 'email', 'first_name', 'last_name', 'role', 'role_detail', 
+                 'role_name', 'is_active', 'date_joined', 'last_login']
+        read_only_fields = ['id', 'date_joined', 'role_detail', 'role_name']
 
 class PatientSerializer(serializers.ModelSerializer):
-    user = UserSerializer(read_only=True)
-    
     class Meta:
         model = Patient
         fields = '__all__'
@@ -34,7 +40,8 @@ class AppointmentSerializer(serializers.ModelSerializer):
         read_only_fields = ['created_at', 'updated_at']
     
     def get_patient_name(self, obj):
-        return f"{obj.patient.user.first_name} {obj.patient.user.last_name}"
+        # Since Patient only has user_id, we can't get the name directly
+        return f"Patient ID: {obj.patient.user_id}"
     
     def get_clinician_name(self, obj):
         return f"Dr. {obj.clinician.user.first_name} {obj.clinician.user.last_name}"
@@ -49,7 +56,8 @@ class MedicalRecordSerializer(serializers.ModelSerializer):
         read_only_fields = ['created_at', 'updated_at']
     
     def get_patient_name(self, obj):
-        return f"{obj.patient.user.first_name} {obj.patient.user.last_name}"
+        # Since Patient only has user_id, we can't get the name directly
+        return f"Patient ID: {obj.patient.user_id}"
     
     def get_clinician_name(self, obj):
         return f"Dr. {obj.clinician.user.first_name} {obj.clinician.user.last_name}"
@@ -64,10 +72,33 @@ class PrescriptionSerializer(serializers.ModelSerializer):
         read_only_fields = ['created_at']
     
     def get_patient_name(self, obj):
-        return f"{obj.patient.user.first_name} {obj.patient.user.last_name}"
+        # Since Patient only has user_id, we can't get the name directly
+        return f"Patient ID: {obj.patient.user_id}"
     
     def get_clinician_name(self, obj):
         return f"Dr. {obj.clinician.user.first_name} {obj.clinician.user.last_name}"
+
+class CancerTypeSerializer(serializers.ModelSerializer):
+    subtypes = serializers.SerializerMethodField()
+    parent_details = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = CancerType
+        fields = ['id', 'cancer_type', 'description', 'parent', 'parent_details', 'subtypes', 'created_at', 'updated_at']
+        read_only_fields = ['created_at', 'updated_at']
+    
+    def get_subtypes(self, obj):
+        # Get all subtypes of this cancer type
+        subtypes = obj.subtypes.all()
+        return CancerTypeSerializer(subtypes, many=True, read_only=True).data
+    
+    def get_parent_details(self, obj):
+        if obj.parent:
+            return {
+                'id': obj.parent.id,
+                'cancer_type': obj.parent.cancer_type
+            }
+        return None
 
 class EventLogSerializer(serializers.ModelSerializer):
     class Meta:

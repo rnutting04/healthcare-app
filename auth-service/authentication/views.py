@@ -76,11 +76,19 @@ def login(request):
         access_token = generate_access_token(user)
         refresh_token = generate_refresh_token(user)
         
+        # Check if there's a 'next' parameter in the request
+        next_url = request.data.get('next', '')
+        if next_url and next_url.startswith('/'):  # Ensure it's a relative URL for security
+            redirect_url = next_url
+        else:
+            # Default redirect based on role
+            redirect_url = f'/{user.role.name.lower()}/dashboard'
+        
         response = Response({
             'user': UserSerializer(user).data,
             'access_token': access_token,
             'refresh_token': refresh_token,
-            'redirect_url': f'/{user.role.name.lower()}/dashboard'
+            'redirect_url': redirect_url
         }, status=status.HTTP_200_OK)
         
         # Set secure cookies for session management

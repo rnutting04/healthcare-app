@@ -101,6 +101,24 @@ services:
     volumes:
       - ./database-service:/app
 
+  admin-service:
+    build:
+      context: ./admin-service
+      dockerfile: Dockerfile
+    ports:
+      - "8005:8005"
+    environment:
+      - DATABASE_SERVICE_URL=http://database-service:8004
+      - AUTH_SERVICE_URL=http://auth-service:8001
+      - SECRET_KEY=${SECRET_KEY:-your-secret-key-here}
+      - DEBUG=${DEBUG:-True}
+      - ALLOWED_HOSTS=${ALLOWED_HOSTS:-*}
+    depends_on:
+      - database-service
+      - auth-service
+    volumes:
+      - ./admin-service:/app
+
   nginx:
     build:
       context: ./nginx
@@ -112,10 +130,12 @@ services:
       - patient-service
       - clinician-service
       - database-service
+      - admin-service
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - patient-static:/patient-static
       - auth-static:/auth-static
+      - admin-static:/admin-static
 
   pgadmin:
     image: dpage/pgadmin4:9.5.0
@@ -136,3 +156,4 @@ volumes:
   pgadmin_data:
   patient-static:
   auth-static:
+  admin-static:

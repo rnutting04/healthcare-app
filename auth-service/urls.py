@@ -1,4 +1,3 @@
-from django.contrib import admin
 from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
@@ -21,7 +20,7 @@ schema_view = get_schema_view(
 )
 
 urlpatterns = [
-    path('admin/', admin.site.urls),
+    # Removed Django admin to avoid conflicts with admin-service
     path('api/auth/', include('authentication.urls')),
     path('health/', include('authentication.health_urls')),
     

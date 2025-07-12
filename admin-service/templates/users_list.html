@@ -1,0 +1,142 @@
+{% extends 'base.html' %}
+
+{% block title %}User Management - Healthcare Portal{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Page Header -->
+    <div class="bg-white shadow rounded-lg p-6">
+        <div class="flex justify-between items-center">
+            <div>
+                <h1 class="text-2xl font-bold text-gray-900">User Management</h1>
+                <p class="mt-1 text-sm text-gray-600">View and manage system users</p>
+            </div>
+            
+            <!-- Filters -->
+            <div class="flex space-x-3">
+                <form method="GET" class="flex space-x-3">
+                    <select name="role" onchange="this.form.submit()" class="rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
+                        <option value="">All Roles</option>
+                        <option value="PATIENT" {% if role_filter == 'PATIENT' %}selected{% endif %}>Patients</option>
+                        <option value="CLINICIAN" {% if role_filter == 'CLINICIAN' %}selected{% endif %}>Clinicians</option>
+                        <option value="ADMIN" {% if role_filter == 'ADMIN' %}selected{% endif %}>Admins</option>
+                    </select>
+                    
+                    <select name="status" onchange="this.form.submit()" class="rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
+                        <option value="">All Status</option>
+                        <option value="active" {% if status_filter == 'active' %}selected{% endif %}>Active</option>
+                        <option value="inactive" {% if status_filter == 'inactive' %}selected{% endif %}>Inactive</option>
+                    </select>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Users Table -->
+    <div class="bg-white shadow rounded-lg overflow-hidden">
+        <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50">
+                <tr>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">User</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Role</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Joined</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                </tr>
+            </thead>
+            <tbody class="bg-white divide-y divide-gray-200">
+                {% for user in users %}
+                <tr class="hover:bg-gray-50">
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <div class="flex items-center">
+                            <div class="flex-shrink-0 h-10 w-10">
+                                <div class="h-10 w-10 rounded-full bg-gray-300 flex items-center justify-center">
+                                    <span class="text-gray-600 font-medium">{{ user.first_name.0 }}{{ user.last_name.0 }}</span>
+                                </div>
+                            </div>
+                            <div class="ml-4">
+                                <div class="text-sm font-medium text-gray-900">{{ user.first_name }} {{ user.last_name }}</div>
+                                <div class="text-sm text-gray-500">ID: {{ user.id }}</div>
+                            </div>
+                        </div>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <div class="text-sm text-gray-900">{{ user.email }}</div>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
+                            {% if user.role_name == 'ADMIN' %}bg-red-100 text-red-800
+                            {% elif user.role_name == 'CLINICIAN' %}bg-purple-100 text-purple-800
+                            {% else %}bg-blue-100 text-blue-800{% endif %}">
+                            {{ user.role_name }}
+                        </span>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        {% if user.is_active %}
+                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+                                Active
+                            </span>
+                        {% else %}
+                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">
+                                Inactive
+                            </span>
+                        {% endif %}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {{ user.date_joined|date:"M d, Y" }}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                        <div class="flex space-x-3">
+                            <a href="/admin/users/{{ user.id }}" class="text-blue-600 hover:text-blue-900">View</a>
+                            
+                            {% if user.id != request.user_data.user_id %}
+                                <form method="POST" action="/admin/users/{{ user.id }}/toggle-status" class="inline">
+                                    {% csrf_token %}
+                                    {% if user.is_active %}
+                                        <input type="hidden" name="action" value="deactivate">
+                                        <button type="submit" class="text-red-600 hover:text-red-900" 
+                                                onclick="return confirm('Are you sure you want to deactivate this user?');">
+                                            Deactivate
+                                        </button>
+                                    {% else %}
+                                        <input type="hidden" name="action" value="activate">
+                                        <button type="submit" class="text-green-600 hover:text-green-900">
+                                            Activate
+                                        </button>
+                                    {% endif %}
+                                </form>
+                            {% endif %}
+                        </div>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="6" class="px-6 py-4 text-center text-gray-500">
+                        No users found matching your criteria.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<style>
+    select {
+        border: 1px solid #d1d5db;
+        padding: 0.5rem 2rem 0.5rem 0.75rem;
+        background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+        background-position: right 0.5rem center;
+        background-repeat: no-repeat;
+        background-size: 1.5em 1.5em;
+        appearance: none;
+    }
+    
+    select:focus {
+        outline: none;
+        border-color: #3b82f6;
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    }
+</style>
+{% endblock %}
