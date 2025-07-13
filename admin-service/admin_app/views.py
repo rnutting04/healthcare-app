@@ -370,6 +370,19 @@ def update_patient_info(request, patient_id):
     
     return redirect('users_list')
 
+# Document Management for RAG
+def document_upload(request):
+    """Document upload page for RAG system"""
+    try:
+        context = {
+            'user': request.user_data
+        }
+        return render(request, 'document_upload.html', context)
+    except Exception as e:
+        logger.error(f"Document upload page error: {str(e)}")
+        messages.error(request, "Error loading document upload page")
+        return redirect('dashboard')
+
 # Health check
 def health_check(request):
     """Health check endpoint"""

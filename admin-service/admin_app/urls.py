@@ -20,6 +20,9 @@ urlpatterns = [
     # Patient Management
     path('admin/patients/<int:patient_id>/update/', views.update_patient_info, name='update_patient_info'),
     
+    # Document Management for RAG
+    path('admin/documents/upload/', views.document_upload, name='document_upload'),
+    
     # Health check
     path('health/', views.health_check, name='health_check'),
 ]

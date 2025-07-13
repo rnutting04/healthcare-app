@@ -53,6 +53,18 @@ class JWTAuthenticationMiddleware:
             # Attach user data to request
             request.user_data = payload
             
+            # Try to fetch full user data from database service
+            try:
+                from .services import DatabaseService
+                user_id = payload.get('user_id')
+                if user_id:
+                    full_user_data = DatabaseService.get_user(user_id)
+                    # Merge the full user data with the JWT payload
+                    request.user_data = {**payload, **full_user_data}
+            except Exception as e:
+                logger.warning(f"Could not fetch full user data: {str(e)}")
+                # Continue with just the JWT payload data
+            
         except jwt.ExpiredSignatureError:
             if request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.path.startswith('/api/'):
                 return JsonResponse({'error': 'Token has expired'}, status=401)

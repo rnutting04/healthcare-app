@@ -1,0 +1,128 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Document Upload - Healthcare Portal{% endblock %}
+
+{% block extra_head %}
+<link href="{% static 'css/document-upload.css' %}" rel="stylesheet">
+{% endblock %}
+
+{% block content %}
+<div class="document-upload-container">
+    <!-- Header -->
+    <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+        <div class="flex items-center justify-between">
+            <div>
+                <h1 class="text-2xl font-bold text-gray-900">Document Upload for RAG System</h1>
+                <p class="text-gray-600 mt-1">Upload documents to enhance the AI knowledge base</p>
+            </div>
+            <a href="/admin/dashboard" class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500">
+                <svg class="h-5 w-5 mr-2 -ml-1 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
+                </svg>
+                Back to Dashboard
+            </a>
+        </div>
+    </div>
+
+    <!-- Upload Section -->
+    <div class="bg-white rounded-lg shadow-md">
+        <!-- Instructions -->
+        <div class="border-b border-gray-200 px-6 py-4">
+            <h2 class="text-lg font-semibold text-gray-900">Upload Instructions</h2>
+            <ul class="mt-2 text-sm text-gray-600 space-y-1">
+                <li class="flex items-start">
+                    <svg class="h-5 w-5 text-green-500 mr-2 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                    </svg>
+                    Supported formats: PDF, DOC, DOCX, TXT, MD
+                </li>
+                <li class="flex items-start">
+                    <svg class="h-5 w-5 text-green-500 mr-2 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                    </svg>
+                    Maximum file size: 10MB per file
+                </li>
+                <li class="flex items-start">
+                    <svg class="h-5 w-5 text-green-500 mr-2 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                    </svg>
+                    Multiple files can be uploaded at once
+                </li>
+            </ul>
+        </div>
+
+        <!-- Upload Form -->
+        <div class="p-6">
+            <form id="documentUploadForm" class="space-y-6">
+                {% csrf_token %}
+
+                <!-- File Upload Area -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Select Files</label>
+                    <div class="upload-dropzone" id="uploadDropzone">
+                        <input type="file" id="fileInput" name="files" multiple accept=".pdf,.doc,.docx,.txt,.md" class="hidden">
+                        <svg class="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48">
+                            <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                        </svg>
+                        <p class="mt-2 text-sm text-gray-600">
+                            <button type="button" class="font-medium text-red-600 hover:text-red-500" id="uploadButton">
+                                Click to upload
+                            </button>
+                            or drag and drop
+                        </p>
+                        <p class="text-xs text-gray-500">PDF, DOC, DOCX, TXT, MD up to 10MB</p>
+                    </div>
+                </div>
+
+                <!-- Selected Files List -->
+                <div id="selectedFilesContainer" class="hidden">
+                    <h3 class="text-sm font-medium text-gray-700 mb-2">Selected Files</h3>
+                    <ul id="selectedFilesList" class="space-y-2"></ul>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="flex justify-end space-x-3 pt-4 border-t border-gray-200">
+                    <button type="button" id="clearButton" class="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500">
+                        Clear All
+                    </button>
+                    <button type="submit" id="uploadSubmitButton" disabled class="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50 disabled:cursor-not-allowed">
+                        Upload Documents
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Recent Uploads -->
+    <div class="mt-8 bg-white rounded-lg shadow-md">
+        <div class="px-6 py-4 border-b border-gray-200">
+            <h2 class="text-lg font-semibold text-gray-900">Recent Uploads</h2>
+        </div>
+        <div class="p-6">
+            <div id="recentUploadsContainer">
+                <p class="text-gray-500 text-center py-8">No documents uploaded yet</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Upload Progress Modal -->
+<div id="uploadProgressModal" class="fixed inset-0 bg-gray-500 bg-opacity-75 hidden z-50">
+    <div class="flex items-center justify-center min-h-screen">
+        <div class="bg-white rounded-lg p-6 max-w-sm w-full">
+            <h3 class="text-lg font-medium text-gray-900 mb-4">Uploading Documents</h3>
+            <div class="progress-container">
+                <div class="progress-bar bg-gray-200 rounded-full h-2">
+                    <div id="progressBar" class="bg-red-600 h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
+                </div>
+                <p id="progressText" class="text-sm text-gray-600 mt-2 text-center">0% Complete</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{% static 'js/document-upload.js' %}"></script>
+{% endblock %}

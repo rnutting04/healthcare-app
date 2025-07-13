@@ -5,8 +5,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Healthcare Portal - Admin{% endblock %}</title>
-    {% now "U" as current_timestamp %}
-    <link href="{% static 'css/main.css' %}?v={{ current_timestamp }}" rel="stylesheet">
     <script src="https://cdn.tailwindcss.com"></script>
     {% block extra_head %}{% endblock %}
 </head>
@@ -30,9 +28,10 @@
                     <a href="/admin/dashboard" class="text-gray-600 hover:text-red-600 transition-colors duration-200">Dashboard</a>
                     <a href="/admin/cancer-types" class="text-gray-600 hover:text-red-600 transition-colors duration-200">Cancer Types</a>
                     <a href="/admin/users" class="text-gray-600 hover:text-red-600 transition-colors duration-200">Users</a>
+                    <a href="/admin/documents/upload" class="text-gray-600 hover:text-red-600 transition-colors duration-200">Documents</a>
                     
                     <span class="text-gray-400">|</span>
-                    <span class="text-gray-700">Welcome, <span class="font-semibold">{{ user.email }}</span></span>
+                    <span class="text-gray-700">Welcome, <span class="font-semibold">{{ user.first_name }} {{ user.last_name }}</span></span>
                     
                     <form action="/logout" method="POST" class="inline">
                         {% csrf_token %}
@@ -60,12 +59,13 @@
             <div class="mobile-menu hidden md:hidden">
                 <div class="px-2 pt-2 pb-3 space-y-1">
                     <div class="px-3 py-2 text-gray-700 border-b border-gray-200">
-                        Welcome, <span class="font-semibold">Admin</span>
+                        Welcome, <span class="font-semibold">{{ user.first_name }} {{ user.last_name }}</span>
                     </div>
                     
                     <a href="/admin/dashboard" class="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-100">Dashboard</a>
                     <a href="/admin/cancer-types" class="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-100">Cancer Types</a>
                     <a href="/admin/users" class="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-100">Users</a>
+                    <a href="/admin/documents/upload" class="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-100">Documents</a>
                     
                     <form action="/logout" method="POST" class="block">
                         {% csrf_token %}
