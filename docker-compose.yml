@@ -121,6 +121,26 @@ services:
     volumes:
       - ./admin-service:/app
 
+  file-service:
+    build:
+      context: ./file-service
+      dockerfile: Dockerfile
+    ports:
+      - "8006:8006"
+    environment:
+      - DATABASE_SERVICE_URL=http://database-service:8004
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-your-secret-key-here}
+      - FILE_STORAGE_PATH=/app/media/encrypted_files
+      - MAX_FILE_SIZE_MB=${MAX_FILE_SIZE_MB:-100}
+      - SECRET_KEY=${SECRET_KEY:-your-secret-key-here}
+      - DEBUG=${DEBUG:-True}
+      - ALLOWED_HOSTS=${ALLOWED_HOSTS:-*}
+    depends_on:
+      - database-service
+    volumes:
+      - ./file-service:/app
+      - file-storage:/app/media/encrypted_files
+
   nginx:
     build:
       context: ./nginx
@@ -133,6 +153,7 @@ services:
       - clinician-service
       - database-service
       - admin-service
+      - file-service
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - patient-static:/patient-static
@@ -159,3 +180,4 @@ volumes:
   patient-static:
   auth-static:
   admin-static:
+  file-storage:

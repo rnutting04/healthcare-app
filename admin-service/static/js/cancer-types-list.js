@@ -126,24 +126,66 @@ function sortTable(column) {
     const currentIcon = document.querySelector(`.sort-icon[data-column="${column}"]`);
     currentIcon.classList.add(sortDirection === 'asc' ? 'sort-asc' : 'sort-desc');
     
-    // Sort rows
-    filteredRows.sort((a, b) => {
-        let valueA, valueB;
+    // Sort rows with hierarchy maintained
+    if (column === 'name') {
+        // Separate parents and children
+        const parents = [];
+        const childrenByParent = {};
         
-        if (column === 'name') {
-            valueA = a.getAttribute('data-name');
-            valueB = b.getAttribute('data-name');
-        } else if (column === 'description') {
-            valueA = a.getAttribute('data-description');
-            valueB = b.getAttribute('data-description');
-        }
+        filteredRows.forEach(row => {
+            const parentId = row.getAttribute('data-parent');
+            if (parentId === '0' || parentId === null) {
+                parents.push(row);
+            } else {
+                if (!childrenByParent[parentId]) {
+                    childrenByParent[parentId] = [];
+                }
+                childrenByParent[parentId].push(row);
+            }
+        });
         
-        if (sortDirection === 'asc') {
-            return valueA.localeCompare(valueB);
-        } else {
-            return valueB.localeCompare(valueA);
-        }
-    });
+        // Sort parents
+        parents.sort((a, b) => {
+            const nameA = a.getAttribute('data-name');
+            const nameB = b.getAttribute('data-name');
+            
+            if (sortDirection === 'asc') {
+                return nameA.localeCompare(nameB);
+            } else {
+                return nameB.localeCompare(nameA);
+            }
+        });
+        
+        // Rebuild filteredRows with sorted hierarchy
+        filteredRows = [];
+        parents.forEach(parent => {
+            filteredRows.push(parent);
+            
+            // Find the parent's ID and add its children
+            const editLink = parent.querySelector('a[href*="/edit"]');
+            if (editLink) {
+                const match = editLink.href.match(/cancer-types\/(\d+)\/edit/);
+                if (match) {
+                    const parentId = match[1];
+                    const children = childrenByParent[parentId] || [];
+                    
+                    // Sort children
+                    children.sort((a, b) => {
+                        const nameA = a.getAttribute('data-name');
+                        const nameB = b.getAttribute('data-name');
+                        
+                        if (sortDirection === 'asc') {
+                            return nameA.localeCompare(nameB);
+                        } else {
+                            return nameB.localeCompare(nameA);
+                        }
+                    });
+                    
+                    filteredRows.push(...children);
+                }
+            }
+        });
+    }
     
     updateDisplay();
 }

@@ -1,16 +1,18 @@
 from rest_framework import viewsets, status
 from rest_framework.decorators import action, api_view
 from rest_framework.response import Response
+from rest_framework.pagination import PageNumberPagination
 from django.core.cache import cache
 from django.conf import settings
 from django.db.models import Q
 from django.utils import timezone
 from datetime import datetime, timedelta
-from .models import User, Patient, Clinician, Appointment, MedicalRecord, Prescription, EventLog, CancerType
+from .models import User, Patient, Clinician, Appointment, MedicalRecord, Prescription, EventLog, CancerType, UserEncryptionKey, FileMetadata, FileAccessLog, RAGDocument
 from .serializers import (
     UserSerializer, PatientSerializer, ClinicianSerializer,
     AppointmentSerializer, MedicalRecordSerializer, PrescriptionSerializer,
-    EventLogSerializer, MedicalRecordCreateSerializer, CancerTypeSerializer
+    EventLogSerializer, MedicalRecordCreateSerializer, CancerTypeSerializer,
+    FileMetadataSerializer, RAGDocumentSerializer
 )
 
 class UserViewSet(viewsets.ModelViewSet):
@@ -327,3 +329,294 @@ class CancerTypeViewSet(viewsets.ModelViewSet):
         subtypes = cancer_type.subtypes.all().order_by('cancer_type')
         serializer = self.get_serializer(subtypes, many=True)
         return Response(serializer.data)
+
+
+class UserEncryptionKeyViewSet(viewsets.ModelViewSet):
+    queryset = UserEncryptionKey.objects.all()
+    serializer_class = None  # No serializer needed as we use custom actions
+    
+    @action(detail=False, methods=['get'])
+    def get_or_create_key(self, request):
+        """Get or create encryption key for a user"""
+        user_id = request.query_params.get('user_id')
+        if not user_id:
+            return Response({'error': 'user_id is required'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            user = User.objects.get(id=user_id)
+            key, created = UserEncryptionKey.objects.get_or_create(user=user)
+            
+            # Generate a new key if it doesn't exist
+            if created or not key.key:
+                from cryptography.fernet import Fernet
+                key.key = Fernet.generate_key().decode()
+                key.save()
+            
+            return Response({
+                'user_id': user.id,
+                'key': key.key,
+                'created': created,
+                'rotated_at': key.rotated_at
+            })
+        except User.DoesNotExist:
+            return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class FileMetadataViewSet(viewsets.ModelViewSet):
+    queryset = FileMetadata.objects.all()
+    serializer_class = FileMetadataSerializer
+    
+    @action(detail=False, methods=['post'])
+    def check_duplicate(self, request):
+        """Check if a file with the given hash already exists"""
+        file_hash = request.data.get('file_hash')
+        if not file_hash:
+            return Response({'error': 'file_hash is required'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        exists = FileMetadata.objects.filter(file_hash=file_hash, is_deleted=False).exists()
+        return Response({
+            'exists': exists,
+            'file_hash': file_hash
+        })
+    
+    @action(detail=False, methods=['post'])
+    def create_metadata(self, request):
+        """Create file metadata record"""
+        try:
+            user_id = request.data.get('user_id')
+            if not user_id:
+                return Response({'error': 'user_id is required'}, status=status.HTTP_400_BAD_REQUEST)
+            
+            user = User.objects.get(id=user_id)
+            
+            # Check for duplicate
+            file_hash = request.data.get('file_hash')
+            if FileMetadata.objects.filter(file_hash=file_hash, is_deleted=False).exists():
+                return Response({'error': 'File already exists'}, status=status.HTTP_409_CONFLICT)
+            
+            metadata = FileMetadata.objects.create(
+                user=user,
+                filename=request.data.get('filename'),
+                file_hash=file_hash,
+                file_size=request.data.get('file_size'),
+                mime_type=request.data.get('mime_type'),
+                storage_path=request.data.get('storage_path'),
+                is_encrypted=request.data.get('is_encrypted', True)
+            )
+            
+            # Log the upload
+            FileAccessLog.objects.create(
+                file=metadata,
+                user=user,
+                access_type='upload',
+                ip_address=request.data.get('ip_address'),
+                user_agent=request.data.get('user_agent'),
+                success=True
+            )
+            
+            return Response({
+                'id': str(metadata.id),
+                'filename': metadata.filename,
+                'uploaded_at': metadata.uploaded_at
+            }, status=status.HTTP_201_CREATED)
+            
+        except User.DoesNotExist:
+            return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
+    @action(detail=False, methods=['get'])
+    def user_files(self, request):
+        """Get all files for a specific user"""
+        user_id = request.query_params.get('user_id')
+        if not user_id:
+            return Response({'error': 'user_id is required'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            files = FileMetadata.objects.filter(
+                user_id=user_id,
+                is_deleted=False
+            ).order_by('-uploaded_at')
+            
+            files_data = [{
+                'id': str(file.id),
+                'filename': file.filename,
+                'file_size': file.file_size,
+                'mime_type': file.mime_type,
+                'uploaded_at': file.uploaded_at,
+                'last_accessed': file.last_accessed
+            } for file in files]
+            
+            return Response(files_data)
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
+    @action(detail=True, methods=['post'])
+    def mark_deleted(self, request, pk=None):
+        """Mark a file as deleted"""
+        try:
+            file = self.get_object()
+            file.is_deleted = True
+            file.deleted_at = timezone.now()
+            file.save()
+            
+            # Log the deletion
+            FileAccessLog.objects.create(
+                file=file,
+                user_id=request.data.get('user_id'),
+                access_type='delete',
+                ip_address=request.data.get('ip_address'),
+                user_agent=request.data.get('user_agent'),
+                success=True
+            )
+            
+            return Response({'message': 'File marked as deleted'})
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
+    @action(detail=True, methods=['post'])
+    def log_access(self, request, pk=None):
+        """Log file access"""
+        try:
+            file = self.get_object()
+            
+            # Update last accessed time
+            file.last_accessed = timezone.now()
+            file.save()
+            
+            # Create access log
+            FileAccessLog.objects.create(
+                file=file,
+                user_id=request.data.get('user_id'),
+                access_type=request.data.get('access_type', 'download'),
+                ip_address=request.data.get('ip_address'),
+                user_agent=request.data.get('user_agent'),
+                success=request.data.get('success', True),
+                error_message=request.data.get('error_message')
+            )
+            
+            return Response({'message': 'Access logged successfully'})
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class RAGDocumentViewSet(viewsets.ModelViewSet):
+    queryset = RAGDocument.objects.select_related('file', 'cancer_type').all()
+    serializer_class = RAGDocumentSerializer
+    pagination_class = PageNumberPagination
+    
+    def list(self, request, *args, **kwargs):
+        """List RAG documents with pagination"""
+        queryset = self.filter_queryset(self.get_queryset())
+        
+        # Apply filtering if needed
+        cancer_type_id = request.query_params.get('cancer_type_id')
+        if cancer_type_id:
+            queryset = queryset.filter(cancer_type_id=cancer_type_id)
+        
+        # Order by upload date
+        queryset = queryset.order_by('-file__uploaded_at')
+        
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            # Use custom format for backwards compatibility
+            data = []
+            for rag_doc in page:
+                data.append({
+                    'file': str(rag_doc.file.id),
+                    'cancer_type_id': rag_doc.cancer_type.id,
+                    'cancer_type': rag_doc.cancer_type.cancer_type,
+                    'file_data': {
+                        'filename': rag_doc.file.filename,
+                        'file_size': rag_doc.file.file_size,
+                        'uploaded_at': rag_doc.file.uploaded_at.isoformat() if rag_doc.file.uploaded_at else None,
+                        'mime_type': rag_doc.file.mime_type,
+                    }
+                })
+            return self.get_paginated_response(data)
+        
+        # If pagination is not configured
+        data = []
+        for rag_doc in queryset:
+            data.append({
+                'file': str(rag_doc.file.id),
+                'cancer_type_id': rag_doc.cancer_type.id,
+                'cancer_type': rag_doc.cancer_type.cancer_type,
+                'file_data': {
+                    'filename': rag_doc.file.filename,
+                    'file_size': rag_doc.file.file_size,
+                    'uploaded_at': rag_doc.file.uploaded_at.isoformat() if rag_doc.file.uploaded_at else None,
+                    'mime_type': rag_doc.file.mime_type,
+                }
+            })
+        return Response(data)
+    
+    def create(self, request, *args, **kwargs):
+        """Create RAG document association"""
+        file_id = request.data.get('file_id')
+        cancer_type_id = request.data.get('cancer_type_id')
+        
+        if not file_id or not cancer_type_id:
+            return Response({'error': 'file_id and cancer_type_id are required'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            # Check if file exists
+            file_metadata = FileMetadata.objects.get(id=file_id)
+            
+            # Check if cancer type exists
+            cancer_type = CancerType.objects.get(id=cancer_type_id)
+            
+            # Create RAG document
+            rag_doc = RAGDocument.objects.create(
+                file=file_metadata,
+                cancer_type=cancer_type
+            )
+            
+            return Response({
+                'file_id': str(rag_doc.file.id),
+                'cancer_type_id': rag_doc.cancer_type.id,
+                'cancer_type': rag_doc.cancer_type.cancer_type,
+                'filename': rag_doc.file.filename
+            }, status=status.HTTP_201_CREATED)
+            
+        except FileMetadata.DoesNotExist:
+            return Response({'error': 'File not found'}, status=status.HTTP_404_NOT_FOUND)
+        except CancerType.DoesNotExist:
+            return Response({'error': 'Cancer type not found'}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['GET'])
+def health_check(request):
+    """Health check endpoint - requires authentication"""
+    try:
+        # Check database connection
+        from django.db import connection
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT 1")
+        
+        # Check cache connection
+        cache_status = 'connected'
+        try:
+            cache.set('health_check', 'ok', 10)
+            cache.get('health_check')
+        except:
+            cache_status = 'disconnected'
+        
+        return Response({
+            'status': 'healthy',
+            'service': 'database-service',
+            'database': 'connected',
+            'cache': cache_status,
+            'authenticated': True,
+            'auth_type': getattr(request, 'auth', 'unknown')
+        })
+    except Exception as e:
+        return Response({
+            'status': 'unhealthy',
+            'service': 'database-service',
+            'error': str(e)
+        }, status=status.HTTP_503_SERVICE_UNAVAILABLE)

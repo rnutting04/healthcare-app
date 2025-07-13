@@ -143,13 +143,17 @@ class AppointmentViewSet(viewsets.ModelViewSet):
     
     def _notify_database_service(self, event_type, data):
         try:
+            headers = {
+                'X-Service-Token': getattr(settings, 'DATABASE_SERVICE_TOKEN', 'db-service-secret-token')
+            }
             requests.post(
                 f"{settings.DATABASE_SERVICE_URL}/api/events/",
                 json={
                     'event_type': event_type,
                     'service': 'patient-service',
                     'data': data
-                }
+                },
+                headers=headers
             )
         except:
             pass

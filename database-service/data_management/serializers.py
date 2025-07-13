@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import User, Role, Patient, Clinician, Appointment, MedicalRecord, Prescription, EventLog, CancerType
+from .models import User, Role, Patient, Clinician, Appointment, MedicalRecord, Prescription, EventLog, CancerType, FileMetadata, RAGDocument
 
 class RoleSerializer(serializers.ModelSerializer):
     class Meta:
@@ -115,3 +115,19 @@ class MedicalRecordCreateSerializer(serializers.Serializer):
     description = serializers.CharField()
     diagnosis = serializers.CharField(required=False, allow_blank=True)
     treatment = serializers.CharField(required=False, allow_blank=True)
+
+
+class FileMetadataSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = FileMetadata
+        fields = '__all__'
+        read_only_fields = ['id', 'uploaded_at', 'last_accessed', 'deleted_at']
+
+
+class RAGDocumentSerializer(serializers.ModelSerializer):
+    cancer_type_name = serializers.CharField(source='cancer_type.cancer_type', read_only=True)
+    file_data = FileMetadataSerializer(source='file', read_only=True)
+    
+    class Meta:
+        model = RAGDocument
+        fields = ['file', 'cancer_type', 'cancer_type_name', 'file_data']

@@ -119,8 +119,11 @@ AUTH_USER_MODEL = 'data_management.User'
 
 # REST Framework settings
 REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'data_management.authentication.ServiceAuthentication',
+    ],
     'DEFAULT_PERMISSION_CLASSES': [
-        'rest_framework.permissions.AllowAny',
+        'data_management.authentication.IsAuthenticatedOrService',
     ],
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 100,
@@ -132,6 +135,12 @@ CORS_ALLOW_CREDENTIALS = True
 
 # Cache TTL settings
 CACHE_TTL = 60 * 15  # 15 minutes
+
+# JWT Configuration (shared with auth service)
+JWT_SECRET_KEY = config('JWT_SECRET_KEY', default='your-secret-key-here')
+
+# Service-to-service authentication token
+SERVICE_TOKEN = config('DATABASE_SERVICE_TOKEN', default='db-service-secret-token')
 
 # Security settings
 SECURE_BROWSER_XSS_FILTER = True

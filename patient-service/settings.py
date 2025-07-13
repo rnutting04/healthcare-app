@@ -131,6 +131,9 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 AUTH_SERVICE_URL = config('AUTH_SERVICE_URL', default='http://auth-service:8001')
 DATABASE_SERVICE_URL = config('DATABASE_SERVICE_URL', default='http://database-service:8004')
 
+# Service authentication token
+DATABASE_SERVICE_TOKEN = config('DATABASE_SERVICE_TOKEN', default='db-service-secret-token')
+
 # JWT Settings
 JWT_SECRET_KEY = config('JWT_SECRET_KEY', default=SECRET_KEY)
 JWT_ALGORITHM = config('JWT_ALGORITHM', default='HS256')

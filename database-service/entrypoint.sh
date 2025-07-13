@@ -12,9 +12,12 @@ echo "PostgreSQL started"
 echo "Waiting for auth-service to initialize..."
 sleep 10
 
-# Run only app-specific migrations
+# Run migrations in the correct order
 echo "Running database migrations..."
-python manage.py migrate data_management --noinput || true
+# First ensure data_management initial migration is applied
+python manage.py migrate data_management 0001_initial --fake-initial --noinput || true
+# Then run all remaining migrations
+python manage.py migrate --noinput || true
 
 # Start the server
 echo "Starting server..."

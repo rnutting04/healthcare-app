@@ -1,6 +1,7 @@
 from django.db import models
 from django.contrib.auth.models import AbstractBaseUser, BaseUserManager
 from django.utils import timezone
+import uuid
 
 class Role(models.Model):
     name = models.CharField(max_length=20, unique=True)
@@ -206,3 +207,86 @@ class EventLog(models.Model):
             models.Index(fields=['service']),
             models.Index(fields=['created_at']),
         ]
+
+
+class UserEncryptionKey(models.Model):
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='encryption_key')
+    key = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    rotated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        db_table = 'user_encryption_keys'
+    
+    def __str__(self):
+        return f"Encryption key for {self.user.email}"
+
+
+class FileMetadata(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='files')
+    filename = models.CharField(max_length=255)
+    file_hash = models.CharField(max_length=64, db_index=True)
+    file_size = models.BigIntegerField()
+    mime_type = models.CharField(max_length=100)
+    storage_path = models.CharField(max_length=500)
+    is_encrypted = models.BooleanField(default=True)
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+    last_accessed = models.DateTimeField(null=True, blank=True)
+    is_deleted = models.BooleanField(default=False)
+    deleted_at = models.DateTimeField(null=True, blank=True)
+    
+    class Meta:
+        db_table = 'file_metadata'
+        ordering = ['-uploaded_at']
+        indexes = [
+            models.Index(fields=['user', '-uploaded_at']),
+            models.Index(fields=['file_hash']),
+        ]
+    
+    def __str__(self):
+        return f"{self.filename} - {self.user.email}"
+
+
+class FileAccessLog(models.Model):
+    ACCESS_TYPE_CHOICES = [
+        ('upload', 'Upload'),
+        ('download', 'Download'),
+        ('delete', 'Delete'),
+        ('view', 'View'),
+    ]
+    
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    file = models.ForeignKey(FileMetadata, on_delete=models.CASCADE, related_name='access_logs')
+    user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)
+    access_type = models.CharField(max_length=20, choices=ACCESS_TYPE_CHOICES)
+    accessed_at = models.DateTimeField(auto_now_add=True)
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    user_agent = models.CharField(max_length=500, null=True, blank=True)
+    success = models.BooleanField(default=True)
+    error_message = models.TextField(null=True, blank=True)
+    
+    class Meta:
+        db_table = 'file_access_logs'
+        ordering = ['-accessed_at']
+        indexes = [
+            models.Index(fields=['file', '-accessed_at']),
+            models.Index(fields=['user', '-accessed_at']),
+        ]
+    
+    def __str__(self):
+        return f"{self.access_type} - {self.file.filename} - {self.accessed_at}"
+
+
+class RAGDocument(models.Model):
+    file = models.OneToOneField(FileMetadata, on_delete=models.CASCADE, primary_key=True, related_name='rag_document')
+    cancer_type = models.ForeignKey(CancerType, on_delete=models.CASCADE, related_name='documents')
+    
+    class Meta:
+        db_table = 'rag_documents'
+        indexes = [
+            models.Index(fields=['cancer_type']),
+        ]
+    
+    def __str__(self):
+        return f"{self.file.filename} - {self.cancer_type}"

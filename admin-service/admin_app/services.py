@@ -17,6 +17,9 @@ class DatabaseService:
         if headers is None:
             headers = {}
         
+        # Add service authentication token
+        headers['X-Service-Token'] = getattr(settings, 'DATABASE_SERVICE_TOKEN', 'db-service-secret-token')
+        
         try:
             response = requests.request(
                 method=method,
@@ -130,6 +133,7 @@ class DatabaseService:
             'patient-service': settings.PATIENT_SERVICE_URL,
             'clinician-service': settings.CLINICIAN_SERVICE_URL,
             'database-service': settings.DATABASE_SERVICE_URL,
+            'file-service': settings.FILE_SERVICE_URL,
             'admin-service': 'http://admin-service:8005'  # Self check
         }
         
@@ -138,8 +142,14 @@ class DatabaseService:
         for service_name, service_url in services.items():
             try:
                 start_time = datetime.now()
+                # File service has health endpoint at /api/health/ instead of /health/
+                if service_name == 'file-service':
+                    health_url = f"{service_url}/api/health/"
+                else:
+                    health_url = f"{service_url}/health/"
+                
                 response = requests.get(
-                    f"{service_url}/health/",
+                    health_url,
                     timeout=5
                 )
                 response_time = (datetime.now() - start_time).total_seconds() * 1000  # Convert to milliseconds
@@ -176,3 +186,15 @@ class DatabaseService:
                 }
         
         return health_status
+    
+    # RAG Document Management
+    @staticmethod
+    def create_rag_document(data):
+        """Create RAG document association"""
+        return DatabaseService.make_request('POST', '/api/rag-documents/', data=data)
+    
+    @staticmethod
+    def get_rag_documents(cancer_type_id=None):
+        """Get RAG documents, optionally filtered by cancer type"""
+        params = {'cancer_type_id': cancer_type_id} if cancer_type_id else None
+        return DatabaseService.make_request('GET', '/api/rag-documents/', params=params)

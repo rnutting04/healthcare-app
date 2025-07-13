@@ -23,6 +23,11 @@ urlpatterns = [
     # Document Management for RAG
     path('admin/documents/upload/', views.document_upload, name='document_upload'),
     
+    # API endpoints
+    path('admin/api/cancer-types/', views.api_cancer_types, name='api_cancer_types'),
+    path('admin/api/rag-documents/', views.api_rag_documents, name='api_rag_documents'),
+    path('admin/api/rag-documents/<str:file_id>/delete/', views.api_delete_rag_document, name='api_delete_rag_document'),
+    
     # Health check
     path('health/', views.health_check, name='health_check'),
 ]

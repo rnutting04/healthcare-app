@@ -210,6 +210,35 @@
     margin-bottom: 0.25rem;
 }
 
+/* Delete Confirmation Modal */
+#deleteConfirmModal {
+    transition: opacity 200ms ease-in-out;
+}
+
+#deleteConfirmModal.opacity-100 {
+    opacity: 1;
+}
+
+#deleteModalContent {
+    transition: all 200ms ease-in-out;
+}
+
+#deleteModalContent.scale-100 {
+    transform: scale(1);
+}
+
+#deleteModalContent.scale-95 {
+    transform: scale(0.95);
+}
+
+#deleteModalContent.opacity-100 {
+    opacity: 1;
+}
+
+#deleteModalContent.opacity-0 {
+    opacity: 0;
+}
+
 /* Responsive Design */
 @media (max-width: 640px) {
     .upload-dropzone {

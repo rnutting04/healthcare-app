@@ -125,12 +125,16 @@ CORS_ALLOW_CREDENTIALS = True
 DATABASE_SERVICE_URL = config('DATABASE_SERVICE_URL', default='http://database-service:8004')
 PATIENT_SERVICE_URL = config('PATIENT_SERVICE_URL', default='http://patient-service:8002')
 CLINICIAN_SERVICE_URL = config('CLINICIAN_SERVICE_URL', default='http://clinician-service:8003')
+FILE_SERVICE_URL = config('FILE_SERVICE_URL', default='http://file-service:8006')
 AUTH_SERVICE_URL = config('AUTH_SERVICE_URL', default='http://auth-service:8001')
 
 # JWT Configuration
 # Use same fallback as auth-service
 JWT_SECRET_KEY = config('JWT_SECRET_KEY', default=config('SECRET_KEY', default='your-secret-key-here'))
 JWT_ALGORITHM = config('JWT_ALGORITHM', default='HS256')
+
+# Service authentication token
+DATABASE_SERVICE_TOKEN = config('DATABASE_SERVICE_TOKEN', default='db-service-secret-token')
 
 # REST Framework settings
 REST_FRAMEWORK = {

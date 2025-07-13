@@ -1,6 +1,7 @@
 from django.shortcuts import render, redirect
 from django.contrib import messages
 from django.views.decorators.http import require_http_methods
+from django.views.decorators.csrf import csrf_exempt
 from django.http import JsonResponse
 from django.conf import settings
 from .services import DatabaseService
@@ -373,6 +374,74 @@ def update_patient_info(request, patient_id):
 # Document Management for RAG
 def document_upload(request):
     """Document upload page for RAG system"""
+    if request.method == 'POST':
+        try:
+            # Get cancer type from form
+            cancer_type_id = request.POST.get('cancer_type')
+            if not cancer_type_id:
+                return JsonResponse({'success': False, 'error': 'Please select a cancer type'}, status=400)
+            
+            # Get files from request
+            files = request.FILES.getlist('files')
+            if not files:
+                return JsonResponse({'success': False, 'error': 'No files provided'}, status=400)
+            
+            uploaded_files = []
+            errors = []
+            
+            # Get JWT token for file service authentication
+            token = request.COOKIES.get('access_token')
+            headers = {'Authorization': f'Bearer {token}'}
+            
+            for file in files:
+                try:
+                    # Upload file to file service
+                    file_service_url = f"{settings.FILE_SERVICE_URL}/api/files/upload"
+                    
+                    files_data = {'file': (file.name, file.read(), file.content_type)}
+                    response = requests.post(file_service_url, files=files_data, headers=headers)
+                    
+                    if response.status_code == 201:
+                        file_data = response.json()
+                        file_id = file_data['file_id']
+                        
+                        # Create RAGDocument association
+                        rag_doc_data = {
+                            'file_id': file_id,
+                            'cancer_type_id': cancer_type_id
+                        }
+                        
+                        db_response = DatabaseService.create_rag_document(rag_doc_data)
+                        
+                        if db_response:
+                            uploaded_files.append({
+                                'filename': file.name,
+                                'file_id': file_id,
+                                'size': file.size
+                            })
+                        else:
+                            errors.append(f"Failed to associate {file.name} with cancer type")
+                    else:
+                        error_msg = response.json().get('message', response.json().get('error', 'Upload failed'))
+                        errors.append(f"{file.name}: {error_msg}")
+                        logger.error(f"File service response: {response.status_code} - {response.text}")
+                        
+                except Exception as e:
+                    logger.error(f"Error uploading {file.name}: {str(e)}")
+                    errors.append(f"{file.name}: Upload error")
+            
+            return JsonResponse({
+                'success': len(uploaded_files) > 0,
+                'uploaded_files': uploaded_files,
+                'errors': errors,
+                'message': f"Successfully uploaded {len(uploaded_files)} file(s)"
+            })
+            
+        except Exception as e:
+            logger.error(f"Document upload error: {str(e)}")
+            return JsonResponse({'success': False, 'error': 'Upload failed'}, status=500)
+    
+    # GET request - show upload form
     try:
         context = {
             'user': request.user_data
@@ -382,6 +451,101 @@ def document_upload(request):
         logger.error(f"Document upload page error: {str(e)}")
         messages.error(request, "Error loading document upload page")
         return redirect('dashboard')
+
+def api_cancer_types(request):
+    """API endpoint to get cancer types (parent types only)"""
+    try:
+        # Get cancer types from database service
+        cancer_types = DatabaseService.get_cancer_types()
+        logger.info(f"API cancer types raw response: {type(cancer_types)}")
+        
+        # Process the response based on its format (same as cancer_type_create)
+        if isinstance(cancer_types, list):
+            # Filter to only show parent types (where parent is None)
+            parent_types = [ct for ct in cancer_types if ct.get('parent') is None]
+        elif isinstance(cancer_types, dict) and 'results' in cancer_types:
+            # Filter to only show parent types (where parent is None)
+            parent_types = [ct for ct in cancer_types['results'] if ct.get('parent') is None]
+        else:
+            parent_types = []
+        
+        logger.info(f"API cancer types filtered count: {len(parent_types)}")
+        return JsonResponse(parent_types, safe=False)
+    except Exception as e:
+        logger.error(f"Error fetching cancer types: {str(e)}")
+        return JsonResponse({'error': 'Failed to fetch cancer types'}, status=500)
+
+def api_rag_documents(request):
+    """API endpoint to get paginated RAG documents"""
+    try:
+        page = request.GET.get('page', 1)
+        page_size = request.GET.get('page_size', 10)
+        cancer_type_id = request.GET.get('cancer_type_id')
+        
+        # Build params
+        params = {'page': page, 'page_size': page_size}
+        if cancer_type_id:
+            params['cancer_type_id'] = cancer_type_id
+        
+        # Get RAG documents from database service
+        headers = {
+            'X-Service-Token': getattr(settings, 'DATABASE_SERVICE_TOKEN', 'db-service-secret-token')
+        }
+        response = requests.get(
+            f"{settings.DATABASE_SERVICE_URL}/api/rag-documents/",
+            params=params,
+            headers=headers
+        )
+        response.raise_for_status()
+        data = response.json()
+        
+        # The database service now includes file_data directly
+        return JsonResponse(data)
+    except Exception as e:
+        logger.error(f"Error fetching RAG documents: {str(e)}")
+        return JsonResponse({'error': 'Failed to fetch documents'}, status=500)
+
+@csrf_exempt
+@require_http_methods(["DELETE"])
+def api_delete_rag_document(request, file_id):
+    """API endpoint to delete a RAG document"""
+    if request.method != 'DELETE':
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
+        
+    try:
+        # Get the JWT token from cookies (same as file upload)
+        jwt_token = request.COOKIES.get('access_token')
+        if not jwt_token:
+            return JsonResponse({'error': 'Authentication required'}, status=401)
+        
+        # Step 1: Delete the file from file service
+        file_service_url = f"{settings.FILE_SERVICE_URL}/api/files/{file_id}/delete"
+        headers = {'Authorization': f'Bearer {jwt_token}'}
+        
+        file_response = requests.delete(file_service_url, headers=headers)
+        if file_response.status_code not in [200, 204, 404]:
+            logger.error(f"Failed to delete file from file service: {file_response.status_code}")
+            # Continue with database deletion even if file deletion fails
+        
+        # Step 2: Delete the RAG document from database service
+        db_headers = {
+            'X-Service-Token': getattr(settings, 'DATABASE_SERVICE_TOKEN', 'db-service-secret-token')
+        }
+        # RAGDocument uses file_id as primary key
+        db_response = requests.delete(
+            f"{settings.DATABASE_SERVICE_URL}/api/rag-documents/{file_id}/",
+            headers=db_headers
+        )
+        
+        if db_response.status_code not in [200, 204]:
+            logger.error(f"Failed to delete RAG document from database: {db_response.status_code}")
+            return JsonResponse({'error': 'Failed to delete document record'}, status=500)
+        
+        return JsonResponse({'message': 'Document deleted successfully'})
+        
+    except Exception as e:
+        logger.error(f"Error deleting RAG document: {str(e)}")
+        return JsonResponse({'error': 'Failed to delete document'}, status=500)
 
 # Health check
 def health_check(request):
