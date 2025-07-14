@@ -153,9 +153,9 @@ def upload_file(request):
             'user_agent': request.META.get('HTTP_USER_AGENT')
         }
         
-        logger.info(f"Sending metadata to database service: {metadata_payload}")
-        logger.info(f"Database URL: {settings.DATABASE_SERVICE_URL}/api/files/create_metadata/")
-        logger.info(f"Headers: {get_db_headers()}")
+        # logger.info(f"Sending metadata to database service: {metadata_payload}")
+        # logger.info(f"Database URL: {settings.DATABASE_SERVICE_URL}/api/files/create_metadata/")
+        # logger.info(f"Headers: {get_db_headers()}")
         
         metadata_response = requests.post(
             f"{settings.DATABASE_SERVICE_URL}/api/files/create_metadata/",
@@ -163,8 +163,8 @@ def upload_file(request):
             json=metadata_payload
         )
         
-        logger.info(f"Metadata creation response: {metadata_response.status_code}")
-        logger.info(f"Response content: {metadata_response.text}")
+        # logger.info(f"Metadata creation response: {metadata_response.status_code}")
+        # logger.info(f"Response content: {metadata_response.text}")
         
         if metadata_response.status_code == 201:
             file_data = metadata_response.json()
@@ -394,10 +394,10 @@ def delete_user_file(request, file_id):
             # Delete physical file
             try:
                 storage_path = file_metadata['storage_path']
-                logger.info(f"Attempting to delete file at: {storage_path}")
+                # logger.info(f"Attempting to delete file at: {storage_path}")
                 
                 if delete_file(storage_path):
-                    logger.info(f"Successfully deleted file: {storage_path}")
+                    # logger.info(f"Successfully deleted file: {storage_path}")
                 else:
                     logger.warning(f"File not found at: {storage_path}")
             except Exception as e:

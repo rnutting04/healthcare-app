@@ -9,7 +9,7 @@ from .middleware_language import UserLanguageMiddleware
 class JWTAuthenticationMiddleware:
     def __init__(self, get_response):
         self.get_response = get_response
-        self.excluded_paths = ['/health/', '/swagger/', '/redoc/', '/admin/']
+        self.excluded_paths = ['/health/', '/swagger/', '/redoc/', '/admin/', '/static/', '/patient/static/']
         self.api_paths = ['/api/']
         self.auth_service_url = settings.AUTH_SERVICE_URL
 

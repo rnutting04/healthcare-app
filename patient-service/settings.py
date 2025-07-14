@@ -31,7 +31,6 @@ MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'corsheaders.middleware.CorsMiddleware',
-    'django.middleware.locale.LocaleMiddleware',  # Add locale middleware
     'django.middleware.common.CommonMiddleware',
     'patients.middleware.JWTAuthenticationMiddleware',  # Moved before CSRF
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -61,17 +60,17 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'wsgi.application'
 
-# Database - Use PostgreSQL
+# Minimal database config for Django internals (using in-memory SQLite)
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': config('DB_NAME', default='healthcare_db'),
-        'USER': config('DB_USER', default='healthcare_user'),
-        'PASSWORD': config('DB_PASSWORD', default='healthcare_password'),
-        'HOST': config('DB_HOST', default='postgres'),
-        'PORT': config('DB_PORT', default='5432'),
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': ':memory:',
     }
 }
+
+# Database Service URL
+DATABASE_SERVICE_URL = config('DATABASE_SERVICE_URL', default='http://database-service:8004')
+DATABASE_SERVICE_TOKEN = config('DATABASE_SERVICE_TOKEN', default='db-service-secret-token')
 
 # Password validation
 AUTH_PASSWORD_VALIDATORS = [

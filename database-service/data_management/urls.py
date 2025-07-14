@@ -3,6 +3,8 @@ from rest_framework.routers import DefaultRouter
 from . import views
 
 router = DefaultRouter()
+router.register(r'languages', views.LanguageViewSet)
+router.register(r'roles', views.RoleViewSet)
 router.register(r'users', views.UserViewSet)
 router.register(r'patients', views.PatientViewSet)
 router.register(r'clinicians', views.ClinicianViewSet)
@@ -13,6 +15,7 @@ router.register(r'cancer-types', views.CancerTypeViewSet)
 router.register(r'encryption-keys', views.UserEncryptionKeyViewSet)
 router.register(r'files', views.FileMetadataViewSet)
 router.register(r'rag-documents', views.RAGDocumentViewSet)
+router.register(r'refresh-tokens', views.RefreshTokenViewSet)
 
 urlpatterns = [
     path('', include(router.urls)),

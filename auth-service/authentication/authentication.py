@@ -2,7 +2,11 @@ import jwt
 from django.conf import settings
 from django.utils import timezone
 from rest_framework import authentication, exceptions
-from .models import User
+from .services import DatabaseService
+import logging
+
+logger = logging.getLogger(__name__)
+
 
 class JWTAuthentication(authentication.BaseAuthentication):
     def authenticate(self, request):
@@ -30,11 +34,56 @@ class JWTAuthentication(authentication.BaseAuthentication):
             raise exceptions.AuthenticationFailed('Invalid access token.')
         
         try:
-            user = User.objects.get(id=payload['user_id'])
-        except User.DoesNotExist:
-            raise exceptions.AuthenticationFailed('User not found.')
-        
-        if not user.is_active:
-            raise exceptions.AuthenticationFailed('User account is disabled.')
-        
-        return (user, token)
+            user_id = payload.get('user_id')
+            user_data = DatabaseService.get_user_by_id(user_id)
+            
+            if not user_data:
+                raise exceptions.AuthenticationFailed('User not found.')
+            
+            if not user_data.get('is_active', False):
+                raise exceptions.AuthenticationFailed('User account is disabled.')
+            
+            # Create a simple user object that DRF can work with
+            class AuthenticatedUser:
+                def __init__(self, data):
+                    self.id = data.get('id')
+                    self.pk = self.id  # DRF often uses pk
+                    self.email = data.get('email')
+                    self.first_name = data.get('first_name')
+                    self.last_name = data.get('last_name')
+                    self.is_active = data.get('is_active', True)
+                    self.is_authenticated = True
+                    self.is_anonymous = False
+                    self._data = data  # Store original data
+                    
+                    # Handle role
+                    if isinstance(data.get('role'), dict):
+                        self.role = type('obj', (object,), {
+                            'id': data['role']['id'],
+                            'name': data['role']['name'],
+                            'display_name': data['role'].get('display_name', ''),
+                        })()
+                    else:
+                        # Fallback if role is just an ID
+                        self.role = type('obj', (object,), {
+                            'id': data.get('role_id'),
+                            'name': payload.get('role', 'PATIENT'),
+                        })()
+                
+                def __str__(self):
+                    return self.email
+                
+                def to_dict(self):
+                    """Convert back to dictionary for serialization"""
+                    return self._data
+            
+            user = AuthenticatedUser(user_data)
+            
+            # Store user_id in request for easy access
+            request.user_id = user_id
+            
+            return (user, token)
+            
+        except Exception as e:
+            logger.error(f"Authentication failed: {e}")
+            raise exceptions.AuthenticationFailed('Authentication failed.')

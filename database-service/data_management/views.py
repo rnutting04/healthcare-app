@@ -7,13 +7,76 @@ from django.conf import settings
 from django.db.models import Q
 from django.utils import timezone
 from datetime import datetime, timedelta
-from .models import User, Patient, Clinician, Appointment, MedicalRecord, Prescription, EventLog, CancerType, UserEncryptionKey, FileMetadata, FileAccessLog, RAGDocument
+from .models import User, Role, Patient, Clinician, Appointment, MedicalRecord, Prescription, EventLog, CancerType, UserEncryptionKey, FileMetadata, FileAccessLog, RAGDocument, RefreshToken, Language
 from .serializers import (
     UserSerializer, PatientSerializer, ClinicianSerializer,
     AppointmentSerializer, MedicalRecordSerializer, PrescriptionSerializer,
     EventLogSerializer, MedicalRecordCreateSerializer, CancerTypeSerializer,
-    FileMetadataSerializer, RAGDocumentSerializer
+    FileMetadataSerializer, RAGDocumentSerializer, LanguageSerializer
 )
+
+
+class LanguageViewSet(viewsets.ModelViewSet):
+    queryset = Language.objects.filter(is_active=True)
+    serializer_class = LanguageSerializer
+    
+    def list(self, request):
+        """List all active languages"""
+        languages = self.get_queryset().order_by('display_order', 'name')
+        data = [{
+            'code': lang.code,
+            'name': lang.name,
+            'native_name': lang.native_name,
+            'is_active': lang.is_active,
+            'display_order': lang.display_order
+        } for lang in languages]
+        return Response(data)
+    
+    def retrieve(self, request, pk=None):
+        """Get single language by code"""
+        try:
+            language = Language.objects.get(code=pk)
+            return Response({
+                'code': language.code,
+                'name': language.name,
+                'native_name': language.native_name,
+                'is_active': language.is_active,
+                'display_order': language.display_order
+            })
+        except Language.DoesNotExist:
+            return Response({'error': 'Language not found'}, status=status.HTTP_404_NOT_FOUND)
+
+
+class RoleViewSet(viewsets.ModelViewSet):
+    queryset = Role.objects.all()
+    serializer_class = None  # We'll use custom responses
+    
+    def list(self, request):
+        """List all roles"""
+        roles = self.get_queryset()
+        data = [{
+            'id': role.id,
+            'name': role.name,
+            'display_name': role.display_name,
+            'description': role.description,
+            'created_at': role.created_at.isoformat() if role.created_at else None
+        } for role in roles]
+        return Response(data)
+    
+    def retrieve(self, request, pk=None):
+        """Get single role"""
+        try:
+            role = self.get_object()
+            return Response({
+                'id': role.id,
+                'name': role.name,
+                'display_name': role.display_name,
+                'description': role.description,
+                'created_at': role.created_at.isoformat() if role.created_at else None
+            })
+        except Role.DoesNotExist:
+            return Response({'error': 'Role not found'}, status=status.HTTP_404_NOT_FOUND)
+
 
 class UserViewSet(viewsets.ModelViewSet):
     queryset = User.objects.all()
@@ -71,10 +134,25 @@ class UserViewSet(viewsets.ModelViewSet):
             return Response(cached_user)
         
         try:
-            user = User.objects.get(email=email)
-            serializer = self.get_serializer(user)
-            cache.set(cache_key, serializer.data, settings.CACHE_TTL)
-            return Response(serializer.data)
+            user = User.objects.select_related('role').get(email=email)
+            data = {
+                'id': user.id,
+                'email': user.email,
+                'password': user.password,  # Include password for service-to-service auth
+                'first_name': user.first_name,
+                'last_name': user.last_name,
+                'role': {
+                    'id': user.role.id,
+                    'name': user.role.name,
+                    'display_name': user.role.display_name,
+                    'description': user.role.description
+                },
+                'is_active': user.is_active,
+                'date_joined': user.date_joined,
+                'last_login': user.last_login
+            }
+            cache.set(cache_key, data, settings.CACHE_TTL)
+            return Response(data)
         except User.DoesNotExist:
             return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
 
@@ -620,3 +698,110 @@ def health_check(request):
             'service': 'database-service',
             'error': str(e)
         }, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+
+
+class RefreshTokenViewSet(viewsets.ModelViewSet):
+    queryset = RefreshToken.objects.all()
+    serializer_class = None  # We'll use custom actions
+    
+    @action(detail=False, methods=['post'])
+    def create_token(self, request):
+        """Create a new refresh token"""
+        user_id = request.data.get('user_id')
+        token = request.data.get('token')
+        expires_at = request.data.get('expires_at')
+        
+        if not all([user_id, token, expires_at]):
+            return Response({'error': 'user_id, token, and expires_at are required'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            user = User.objects.get(id=user_id)
+            
+            # Convert expires_at string to datetime
+            from dateutil import parser
+            expires_at_dt = parser.parse(expires_at)
+            
+            refresh_token = RefreshToken.objects.create(
+                user=user,
+                token=token,
+                expires_at=expires_at_dt,
+                is_active=True
+            )
+            
+            return Response({
+                'id': refresh_token.id,
+                'user_id': user.id,
+                'token': refresh_token.token,
+                'created_at': refresh_token.created_at,
+                'expires_at': refresh_token.expires_at,
+                'is_active': refresh_token.is_active
+            }, status=status.HTTP_201_CREATED)
+            
+        except User.DoesNotExist:
+            return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
+    @action(detail=False, methods=['get'])
+    def validate_token(self, request):
+        """Validate a refresh token"""
+        token = request.query_params.get('token')
+        if not token:
+            return Response({'error': 'token parameter required'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            refresh_token = RefreshToken.objects.select_related('user').get(
+                token=token,
+                is_active=True,
+                expires_at__gt=timezone.now()
+            )
+            
+            return Response({
+                'id': refresh_token.id,
+                'user_id': refresh_token.user.id,
+                'user_email': refresh_token.user.email,
+                'expires_at': refresh_token.expires_at,
+                'is_valid': True
+            })
+        except RefreshToken.DoesNotExist:
+            return Response({'is_valid': False}, status=status.HTTP_404_NOT_FOUND)
+    
+    @action(detail=False, methods=['post'])
+    def invalidate_token(self, request):
+        """Invalidate a refresh token"""
+        token = request.data.get('token')
+        if not token:
+            return Response({'error': 'token is required'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            refresh_token = RefreshToken.objects.get(token=token)
+            refresh_token.is_active = False
+            refresh_token.save()
+            
+            return Response({'message': 'Token invalidated successfully'})
+        except RefreshToken.DoesNotExist:
+            return Response({'error': 'Token not found'}, status=status.HTTP_404_NOT_FOUND)
+    
+    @action(detail=False, methods=['post'])
+    def invalidate_user_tokens(self, request):
+        """Invalidate all refresh tokens for a user"""
+        user_id = request.data.get('user_id')
+        if not user_id:
+            return Response({'error': 'user_id is required'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        count = RefreshToken.objects.filter(user_id=user_id, is_active=True).update(is_active=False)
+        
+        return Response({
+            'message': f'Invalidated {count} tokens for user',
+            'count': count
+        })
+    
+    @action(detail=False, methods=['delete'])
+    def cleanup_expired(self, request):
+        """Delete expired refresh tokens"""
+        count, _ = RefreshToken.objects.filter(expires_at__lt=timezone.now()).delete()
+        
+        return Response({
+            'message': f'Deleted {count} expired tokens',
+            'count': count
+        })

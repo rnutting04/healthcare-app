@@ -1,5 +1,10 @@
 from rest_framework import serializers
-from .models import User, Role, Patient, Clinician, Appointment, MedicalRecord, Prescription, EventLog, CancerType, FileMetadata, RAGDocument
+from .models import User, Role, Patient, Clinician, Appointment, MedicalRecord, Prescription, EventLog, CancerType, FileMetadata, RAGDocument, Language
+
+class LanguageSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Language
+        fields = '__all__'
 
 class RoleSerializer(serializers.ModelSerializer):
     class Meta:
@@ -17,6 +22,14 @@ class UserSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'date_joined', 'role_detail', 'role_name']
 
 class PatientSerializer(serializers.ModelSerializer):
+    preferred_language_id = serializers.PrimaryKeyRelatedField(
+        source='preferred_language',
+        queryset=Language.objects.all(),
+        required=False,
+        allow_null=True
+    )
+    preferred_language = serializers.CharField(source='preferred_language.code', read_only=True)
+    
     class Meta:
         model = Patient
         fields = '__all__'

@@ -1,37 +1,56 @@
 from rest_framework import serializers
-from django.contrib.auth import authenticate
 from django.contrib.auth.password_validation import validate_password
-from .models import User, Role
+from django.contrib.auth.hashers import check_password, make_password
+from .services import DatabaseService
+import logging
 
-class RoleSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Role
-        fields = ('id', 'name', 'display_name', 'description')
-        read_only_fields = ('id',)
+logger = logging.getLogger(__name__)
 
-class UserSerializer(serializers.ModelSerializer):
-    role_detail = RoleSerializer(source='role', read_only=True)
-    role_id = serializers.PrimaryKeyRelatedField(
-        queryset=Role.objects.all(),
-        source='role',
-        write_only=True
-    )
-    role_name = serializers.CharField(source='role.name', read_only=True)
+
+class RoleSerializer(serializers.Serializer):
+    id = serializers.IntegerField(read_only=True)
+    name = serializers.CharField(max_length=20)
+    display_name = serializers.CharField(max_length=50)
+    description = serializers.CharField(allow_blank=True)
+
+
+class UserSerializer(serializers.Serializer):
+    id = serializers.IntegerField(read_only=True)
+    email = serializers.EmailField()
+    first_name = serializers.CharField(max_length=150)
+    last_name = serializers.CharField(max_length=150)
+    role_id = serializers.IntegerField(write_only=True, required=False)
+    role_detail = RoleSerializer(read_only=True)
+    role_name = serializers.CharField(read_only=True)
+    is_active = serializers.BooleanField(default=True)
+    date_joined = serializers.DateTimeField(read_only=True)
     
-    class Meta:
-        model = User
-        fields = ('id', 'email', 'first_name', 'last_name', 'role_detail', 
-                 'role_id', 'role_name', 'is_active', 'date_joined')
-        read_only_fields = ('id', 'date_joined')
+    def to_representation(self, instance):
+        """Convert database response to serialized format"""
+        if isinstance(instance, dict):
+            data = super().to_representation(instance)
+            # Add role_detail if role information exists
+            if 'role' in instance and isinstance(instance['role'], dict):
+                data['role_detail'] = instance['role']
+                data['role_name'] = instance['role'].get('name', '')
+            return data
+        return super().to_representation(instance)
 
-class UserRegistrationSerializer(serializers.ModelSerializer):
+
+class UserRegistrationSerializer(serializers.Serializer):
+    email = serializers.EmailField()
     password = serializers.CharField(write_only=True, required=True, validators=[validate_password])
     password_confirm = serializers.CharField(write_only=True, required=True)
+    first_name = serializers.CharField(max_length=150)
+    last_name = serializers.CharField(max_length=150)
     role = serializers.CharField(write_only=True, required=True)
     
-    class Meta:
-        model = User
-        fields = ('email', 'password', 'password_confirm', 'first_name', 'last_name', 'role')
+    def validate_email(self, value):
+        # Check if user already exists
+        existing_user = DatabaseService.get_user_by_email(value)
+        if existing_user:
+            raise serializers.ValidationError("User with this email already exists.")
+        return value
     
     def validate_role(self, value):
         valid_roles = ['PATIENT', 'CLINICIAN']
@@ -48,18 +67,37 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
         validated_data.pop('password_confirm')
         role_name = validated_data.pop('role')
         
-        # Get or create the role
-        role, _ = Role.objects.get_or_create(
-            name=role_name,
-            defaults={
-                'display_name': role_name.capitalize(),
-                'description': f'{role_name.capitalize()} user role'
-            }
-        )
+        # Get role from database service
+        role = DatabaseService.get_role_by_name(role_name)
+        if not role:
+            # Create role if it doesn't exist
+            roles = DatabaseService.get_roles()
+            role = next((r for r in roles if r['name'] == role_name), None)
+            
+        if not role:
+            raise serializers.ValidationError({"role": "Role not found"})
         
-        validated_data['role'] = role
-        user = User.objects.create_user(**validated_data)
-        return user
+        # Hash the password
+        password = validated_data.pop('password')
+        password_hash = make_password(password)
+        
+        # Create user via database service
+        user_data = {
+            'email': validated_data['email'],
+            'password': password_hash,
+            'first_name': validated_data['first_name'],
+            'last_name': validated_data['last_name'],
+            'role': role['id'],
+            'is_active': True
+        }
+        
+        try:
+            user = DatabaseService.create_user(user_data)
+            return user
+        except Exception as e:
+            logger.error(f"Failed to create user: {e}")
+            raise serializers.ValidationError({"error": "Failed to create user"})
+
 
 class LoginSerializer(serializers.Serializer):
     email = serializers.EmailField(required=True)
@@ -70,21 +108,29 @@ class LoginSerializer(serializers.Serializer):
         password = attrs.get('password')
         
         if email and password:
-            user = authenticate(email=email, password=password)
+            # Get user from database service
+            user = DatabaseService.get_user_by_email(email)
             
             if not user:
                 raise serializers.ValidationError('Invalid email or password.')
             
-            if not user.is_active:
+            # Check password
+            if not check_password(password, user.get('password', '')):
+                raise serializers.ValidationError('Invalid email or password.')
+            
+            if not user.get('is_active', False):
                 raise serializers.ValidationError('User account is disabled.')
             
             attrs['user'] = user
-            return attrs
         else:
             raise serializers.ValidationError('Must include "email" and "password".')
+        
+        return attrs
+
 
 class RefreshTokenSerializer(serializers.Serializer):
     refresh_token = serializers.CharField(required=True)
+
 
 class ChangePasswordSerializer(serializers.Serializer):
     old_password = serializers.CharField(required=True, write_only=True)
@@ -93,18 +139,5 @@ class ChangePasswordSerializer(serializers.Serializer):
     
     def validate(self, attrs):
         if attrs['new_password'] != attrs['new_password_confirm']:
-            raise serializers.ValidationError({"new_password": "Password fields didn't match."})
-        return attrs
-
-class PasswordResetSerializer(serializers.Serializer):
-    email = serializers.EmailField(required=True)
-
-class PasswordResetConfirmSerializer(serializers.Serializer):
-    token = serializers.CharField(required=True)
-    new_password = serializers.CharField(required=True, write_only=True, validators=[validate_password])
-    new_password_confirm = serializers.CharField(required=True, write_only=True)
-    
-    def validate(self, attrs):
-        if attrs['new_password'] != attrs['new_password_confirm']:
-            raise serializers.ValidationError({"new_password": "Password fields didn't match."})
+            raise serializers.ValidationError({"new_password": "New password fields didn't match."})
         return attrs

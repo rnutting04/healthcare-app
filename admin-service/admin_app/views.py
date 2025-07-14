@@ -27,7 +27,7 @@ def dashboard(request):
                 cancer_types_count = len(cancer_types['results'])
             elif isinstance(cancer_types, list):
                 cancer_types_count = len(cancer_types)
-            logger.info(f"Cancer types response: {cancer_types}")
+            # logger.info(f"Cancer types response: {cancer_types}")
         except Exception as e:
             logger.error(f"Could not fetch cancer types: {str(e)}")
         
@@ -35,7 +35,7 @@ def dashboard(request):
         api_health = {}
         try:
             api_health = DatabaseService.check_all_services_health()
-            logger.info(f"API health status: {api_health}")
+            # logger.info(f"API health status: {api_health}")
         except Exception as e:
             logger.error(f"Could not fetch API health status: {str(e)}")
         
@@ -56,7 +56,7 @@ def cancer_types_list(request):
     """List all cancer types"""
     try:
         response = DatabaseService.get_cancer_types()
-        logger.info(f"Cancer types response: {response}")
+        # logger.info(f"Cancer types response: {response}")
         
         # The API returns the list directly, not wrapped in 'data'
         if isinstance(response, list):
@@ -66,7 +66,7 @@ def cancer_types_list(request):
         else:
             cancer_types = []
         
-        logger.info(f"Processed cancer types: {cancer_types}")
+        # logger.info(f"Processed cancer types: {cancer_types}")
         
         context = {
             'cancer_types': cancer_types,
@@ -115,7 +115,7 @@ def cancer_type_create(request):
     # Get all cancer types to populate parent dropdown
     try:
         cancer_types = DatabaseService.get_cancer_types()
-        logger.info(f"Retrieved cancer types for dropdown: {cancer_types}")
+        # logger.info(f"Retrieved cancer types for dropdown: {cancer_types}")
         if isinstance(cancer_types, list):
             # Filter to only show parent types (where parent is None)
             parent_options = [ct for ct in cancer_types if ct.get('parent') is None]
@@ -124,7 +124,7 @@ def cancer_type_create(request):
             parent_options = [ct for ct in cancer_types['results'] if ct.get('parent') is None]
         else:
             parent_options = []
-        logger.info(f"Filtered parent options: {parent_options}")
+        # logger.info(f"Filtered parent options: {parent_options}")
     except Exception as e:
         logger.error(f"Error fetching cancer types for dropdown: {str(e)}")
         parent_options = []
@@ -142,7 +142,7 @@ def cancer_type_edit(request, cancer_type_id):
         response = DatabaseService.get_cancer_type(cancer_type_id)
         # The API returns the object directly, not wrapped in 'data'
         cancer_type = response
-        logger.info(f"Editing cancer type {cancer_type_id}: {cancer_type}")
+        # logger.info(f"Editing cancer type {cancer_type_id}: {cancer_type}")
         
         if request.method == "POST":
             data = {
@@ -266,7 +266,7 @@ def user_detail(request, user_id):
             try:
                 patient_response = DatabaseService.get_patient_by_user(user_id)
                 patient_data = patient_response
-                logger.info(f"Successfully fetched patient data for user {user_id}: {patient_data}")
+                # logger.info(f"Successfully fetched patient data for user {user_id}: {patient_data}")
                 
                 # Fetch available languages
                 try:
@@ -286,28 +286,28 @@ def user_detail(request, user_id):
                     if auth_header:
                         headers['Authorization'] = auth_header
                     
-                    logger.info(f"Fetching languages from: {settings.PATIENT_SERVICE_URL}/api/patients/languages/")
+                    # logger.info(f"Fetching languages from: {settings.PATIENT_SERVICE_URL}/api/patients/languages/")
                     languages_response = requests.get(
                         f"{settings.PATIENT_SERVICE_URL}/api/patients/languages/",
                         headers=headers
                     )
-                    logger.info(f"Languages response status: {languages_response.status_code}")
+                    # logger.info(f"Languages response status: {languages_response.status_code}")
                     if languages_response.status_code == 200:
                         languages_data = languages_response.json()
                         # Handle paginated response
                         languages = languages_data.get('results', languages_data)
-                        logger.info(f"Fetched {len(languages)} languages")
+                        # logger.info(f"Fetched {len(languages)} languages")
                         
                         # Log the preferred language to debug
                         if patient_data:
-                            logger.info(f"Patient preferred_language value: {patient_data.get('preferred_language')}")
+                            # logger.info(f"Patient preferred_language value: {patient_data.get('preferred_language')}")
                     else:
-                        logger.warning(f"Failed to fetch languages: {languages_response.status_code}")
+                        # logger.warning(f"Failed to fetch languages: {languages_response.status_code}")
                 except Exception as e:
-                    logger.warning(f"Could not fetch languages: {str(e)}")
+                    # logger.warning(f"Could not fetch languages: {str(e)}")
                     
             except Exception as e:
-                logger.warning(f"Could not fetch patient data for user {user_id}: {str(e)}")
+                # logger.warning(f"Could not fetch patient data for user {user_id}: {str(e)}")
         
         context = {
             'user': user_data,  # Template expects 'user'
@@ -457,7 +457,7 @@ def api_cancer_types(request):
     try:
         # Get cancer types from database service
         cancer_types = DatabaseService.get_cancer_types()
-        logger.info(f"API cancer types raw response: {type(cancer_types)}")
+        # logger.info(f"API cancer types raw response: {type(cancer_types)}")
         
         # Process the response based on its format (same as cancer_type_create)
         if isinstance(cancer_types, list):
@@ -469,7 +469,7 @@ def api_cancer_types(request):
         else:
             parent_types = []
         
-        logger.info(f"API cancer types filtered count: {len(parent_types)}")
+        # logger.info(f"API cancer types filtered count: {len(parent_types)}")
         return JsonResponse(parent_types, safe=False)
     except Exception as e:
         logger.error(f"Error fetching cancer types: {str(e)}")

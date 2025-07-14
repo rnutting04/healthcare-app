@@ -6,8 +6,8 @@ from django.views.decorators.cache import cache_page
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
 from django.utils import timezone
+from django.http import Http404
 from django_ratelimit.decorators import ratelimit
-from .models import User
 from .serializers import (
     UserSerializer, UserRegistrationSerializer, LoginSerializer,
     RefreshTokenSerializer, ChangePasswordSerializer
@@ -18,6 +18,7 @@ from .utils import (
     invalidate_all_user_tokens
 )
 from .permissions import IsOwnerOrAdmin
+from .services import DatabaseService
 
 @api_view(['POST'])
 @permission_classes([permissions.AllowAny])
@@ -27,6 +28,7 @@ def register(request):
     serializer = UserRegistrationSerializer(data=request.data)
     if serializer.is_valid():
         user = serializer.save()
+        # User is now a dictionary from database service
         access_token = generate_access_token(user)
         refresh_token = generate_refresh_token(user)
         
@@ -34,7 +36,7 @@ def register(request):
             'user': UserSerializer(user).data,
             'access_token': access_token,
             'refresh_token': refresh_token,
-            'redirect_url': f'/{user.role.name.lower()}/dashboard'
+            'redirect_url': f'/{user["role"]["name"].lower()}/dashboard'
         }, status=status.HTTP_201_CREATED)
         
         # Set secure cookies for session management
@@ -70,8 +72,8 @@ def login(request):
     serializer = LoginSerializer(data=request.data)
     if serializer.is_valid():
         user = serializer.validated_data['user']
-        user.last_login = timezone.now()
-        user.save(update_fields=['last_login'])
+        # Update last login via database service
+        DatabaseService.update_user(user['id'], {'last_login': timezone.now().isoformat()})
         
         access_token = generate_access_token(user)
         refresh_token = generate_refresh_token(user)
@@ -82,7 +84,7 @@ def login(request):
             redirect_url = next_url
         else:
             # Default redirect based on role
-            redirect_url = f'/{user.role.name.lower()}/dashboard'
+            redirect_url = f'/{user["role"]["name"].lower()}/dashboard'
         
         response = Response({
             'user': UserSerializer(user).data,
@@ -130,7 +132,12 @@ def refresh_token(request):
                 'error': 'Invalid or expired refresh token'
             }, status=status.HTTP_401_UNAUTHORIZED)
         
-        user = refresh_token_obj.user
+        # Get user from database service
+        user = DatabaseService.get_user_by_id(refresh_token_obj['user_id'])
+        if not user:
+            return Response({
+                'error': 'User not found'
+            }, status=status.HTTP_404_NOT_FOUND)
         access_token = generate_access_token(user)
         
         return Response({
@@ -170,31 +177,58 @@ class UserProfileView(generics.RetrieveUpdateAPIView):
     permission_classes = [permissions.IsAuthenticated]
     
     def get_object(self):
-        return self.request.user
+        # Get user from database service using ID from JWT
+        user_id = getattr(self.request, 'user_id', None)
+        if user_id:
+            user = DatabaseService.get_user_by_id(user_id)
+            return user
+        return None
 
 class UserDetailView(generics.RetrieveUpdateDestroyAPIView):
-    queryset = User.objects.all()
     serializer_class = UserSerializer
     permission_classes = [permissions.IsAuthenticated, IsOwnerOrAdmin]
+    
+    def get_object(self):
+        user_id = self.kwargs.get('pk')
+        user = DatabaseService.get_user_by_id(user_id)
+        if not user:
+            raise Http404("User not found")
+        return user
 
 @api_view(['POST'])
 @permission_classes([permissions.IsAuthenticated])
 def change_password(request):
     serializer = ChangePasswordSerializer(data=request.data)
     if serializer.is_valid():
-        user = request.user
+        # Get user from database service
+        user_id = getattr(request, 'user_id', None)
+        if not user_id:
+            return Response({
+                'error': 'User not authenticated'
+            }, status=status.HTTP_401_UNAUTHORIZED)
+            
+        user = DatabaseService.get_user_by_id(user_id)
+        if not user:
+            return Response({
+                'error': 'User not found'
+            }, status=status.HTTP_404_NOT_FOUND)
+            
         old_password = serializer.validated_data['old_password']
         
-        if not user.check_password(old_password):
+        # Check old password
+        from django.contrib.auth.hashers import check_password
+        if not check_password(old_password, user.get('password', '')):
             return Response({
                 'error': 'Invalid old password'
             }, status=status.HTTP_400_BAD_REQUEST)
         
-        user.set_password(serializer.validated_data['new_password'])
-        user.save()
+        # Update password via database service
+        from django.contrib.auth.hashers import make_password
+        new_password_hash = make_password(serializer.validated_data['new_password'])
+        DatabaseService.update_user(user_id, {'password': new_password_hash})
         
         # Invalidate all tokens after password change
-        invalidate_all_user_tokens(user)
+        invalidate_all_user_tokens({'id': user_id})
         
         return Response({
             'message': 'Password successfully changed. Please login again.'
@@ -205,9 +239,24 @@ def change_password(request):
 @api_view(['GET'])
 @permission_classes([permissions.IsAuthenticated])
 def verify_token(request):
+    # Get user from database service
+    user_id = getattr(request, 'user_id', None)
+    if not user_id:
+        return Response({
+            'valid': False,
+            'error': 'User not authenticated'
+        }, status=status.HTTP_401_UNAUTHORIZED)
+        
+    user = DatabaseService.get_user_by_id(user_id)
+    if not user:
+        return Response({
+            'valid': False,
+            'error': 'User not found'
+        }, status=status.HTTP_404_NOT_FOUND)
+        
     return Response({
         'valid': True,
-        'user': UserSerializer(request.user).data
+        'user': UserSerializer(user).data
     }, status=status.HTTP_200_OK)
 
 @api_view(['POST'])

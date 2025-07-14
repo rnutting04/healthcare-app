@@ -1,6 +1,9 @@
 from django.utils import translation
 from django.conf import settings
-from .models import Patient
+from .services import DatabaseService
+import logging
+
+logger = logging.getLogger(__name__)
 
 class UserLanguageMiddleware:
     """
@@ -17,17 +20,23 @@ class UserLanguageMiddleware:
         
         # Try to get the user's preferred language
         try:
-            patient = Patient.objects.select_related('preferred_language').get(user_id=request.user_id)
-            if patient.preferred_language:
-                # Activate the user's preferred language
-                translation.activate(patient.preferred_language.code)
-                request.LANGUAGE_CODE = patient.preferred_language.code
+            patient = DatabaseService.get_patient_by_user_id(request.user_id)
+            logger.info(f"Patient data for user {request.user_id}: {patient}")
+            
+            if patient and patient.get('preferred_language'):
+                # Use the language code directly
+                language_code = patient['preferred_language']
+                logger.info(f"Setting language to: {language_code}")
+                translation.activate(language_code)
+                request.LANGUAGE_CODE = language_code
             else:
                 # Use default language
+                logger.info(f"No preferred language, using default: {settings.LANGUAGE_CODE}")
                 translation.activate(settings.LANGUAGE_CODE)
                 request.LANGUAGE_CODE = settings.LANGUAGE_CODE
-        except Patient.DoesNotExist:
-            # User doesn't have a patient profile yet, use default
+        except Exception as e:
+            # Any error, use default
+            logger.error(f"Error in language middleware: {e}")
             translation.activate(settings.LANGUAGE_CODE)
             request.LANGUAGE_CODE = settings.LANGUAGE_CODE
         
