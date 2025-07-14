@@ -397,6 +397,7 @@ def delete_user_file(request, file_id):
                 # logger.info(f"Attempting to delete file at: {storage_path}")
                 
                 if delete_file(storage_path):
+                    pass
                     # logger.info(f"Successfully deleted file: {storage_path}")
                 else:
                     logger.warning(f"File not found at: {storage_path}")

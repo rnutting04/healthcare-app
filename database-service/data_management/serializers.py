@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import User, Role, Patient, Clinician, Appointment, MedicalRecord, Prescription, EventLog, CancerType, FileMetadata, RAGDocument, Language
+from .models import User, Role, Patient, Appointment, MedicalRecord, Prescription, EventLog, CancerType, FileMetadata, RAGDocument, Language
 
 class LanguageSerializer(serializers.ModelSerializer):
     class Meta:
@@ -14,10 +14,11 @@ class RoleSerializer(serializers.ModelSerializer):
 class UserSerializer(serializers.ModelSerializer):
     role_detail = RoleSerializer(source='role', read_only=True)
     role_name = serializers.CharField(source='role.name', read_only=True)
+    password = serializers.CharField(write_only=True, required=False)
     
     class Meta:
         model = User
-        fields = ['id', 'email', 'first_name', 'last_name', 'role', 'role_detail', 
+        fields = ['id', 'email', 'password', 'first_name', 'last_name', 'role', 'role_detail', 
                  'role_name', 'is_active', 'date_joined', 'last_login']
         read_only_fields = ['id', 'date_joined', 'role_detail', 'role_name']
 
@@ -29,19 +30,23 @@ class PatientSerializer(serializers.ModelSerializer):
         allow_null=True
     )
     preferred_language = serializers.CharField(source='preferred_language.code', read_only=True)
+    phone_number = serializers.CharField(allow_blank=True, required=False)
+    address = serializers.CharField(allow_blank=True, required=False)
+    emergency_contact_name = serializers.CharField(allow_blank=True, required=False)
+    emergency_contact_phone = serializers.CharField(allow_blank=True, required=False)
     
     class Meta:
         model = Patient
         fields = '__all__'
         read_only_fields = ['created_at', 'updated_at']
 
-class ClinicianSerializer(serializers.ModelSerializer):
-    user = UserSerializer(read_only=True)
-    
-    class Meta:
-        model = Clinician
-        fields = '__all__'
-        read_only_fields = ['created_at', 'updated_at']
+# class ClinicianSerializer(serializers.ModelSerializer):
+#     user = UserSerializer(read_only=True)
+#     
+#     class Meta:
+#         model = Clinician
+#         fields = '__all__'
+#         read_only_fields = ['created_at', 'updated_at']
 
 class AppointmentSerializer(serializers.ModelSerializer):
     patient_name = serializers.SerializerMethodField()
@@ -57,7 +62,7 @@ class AppointmentSerializer(serializers.ModelSerializer):
         return f"Patient ID: {obj.patient.user_id}"
     
     def get_clinician_name(self, obj):
-        return f"Dr. {obj.clinician.user.first_name} {obj.clinician.user.last_name}"
+        return obj.clinician_name
 
 class MedicalRecordSerializer(serializers.ModelSerializer):
     patient_name = serializers.SerializerMethodField()
@@ -73,7 +78,7 @@ class MedicalRecordSerializer(serializers.ModelSerializer):
         return f"Patient ID: {obj.patient.user_id}"
     
     def get_clinician_name(self, obj):
-        return f"Dr. {obj.clinician.user.first_name} {obj.clinician.user.last_name}"
+        return obj.clinician_name
 
 class PrescriptionSerializer(serializers.ModelSerializer):
     patient_name = serializers.SerializerMethodField()
@@ -89,7 +94,7 @@ class PrescriptionSerializer(serializers.ModelSerializer):
         return f"Patient ID: {obj.patient.user_id}"
     
     def get_clinician_name(self, obj):
-        return f"Dr. {obj.clinician.user.first_name} {obj.clinician.user.last_name}"
+        return obj.clinician_name
 
 class CancerTypeSerializer(serializers.ModelSerializer):
     subtypes = serializers.SerializerMethodField()

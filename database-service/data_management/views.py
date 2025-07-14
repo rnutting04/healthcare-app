@@ -7,9 +7,9 @@ from django.conf import settings
 from django.db.models import Q
 from django.utils import timezone
 from datetime import datetime, timedelta
-from .models import User, Role, Patient, Clinician, Appointment, MedicalRecord, Prescription, EventLog, CancerType, UserEncryptionKey, FileMetadata, FileAccessLog, RAGDocument, RefreshToken, Language
+from .models import User, Role, Patient, Appointment, MedicalRecord, Prescription, EventLog, CancerType, UserEncryptionKey, FileMetadata, FileAccessLog, RAGDocument, RefreshToken, Language
 from .serializers import (
-    UserSerializer, PatientSerializer, ClinicianSerializer,
+    UserSerializer, PatientSerializer,
     AppointmentSerializer, MedicalRecordSerializer, PrescriptionSerializer,
     EventLogSerializer, MedicalRecordCreateSerializer, CancerTypeSerializer,
     FileMetadataSerializer, RAGDocumentSerializer, LanguageSerializer
@@ -173,28 +173,28 @@ class PatientViewSet(viewsets.ModelViewSet):
         except Patient.DoesNotExist:
             return Response({'error': 'Patient not found'}, status=status.HTTP_404_NOT_FOUND)
 
-class ClinicianViewSet(viewsets.ModelViewSet):
-    queryset = Clinician.objects.select_related('user').all()
-    serializer_class = ClinicianSerializer
-    
-    @action(detail=False, methods=['get'])
-    def available(self, request):
-        clinicians = self.queryset.filter(is_available=True)
-        serializer = self.get_serializer(clinicians, many=True)
-        return Response(serializer.data)
-    
-    @action(detail=False, methods=['get'])
-    def by_specialization(self, request):
-        specialization = request.query_params.get('specialization')
-        if not specialization:
-            return Response({'error': 'specialization parameter required'}, status=status.HTTP_400_BAD_REQUEST)
-        
-        clinicians = self.queryset.filter(specialization__icontains=specialization)
-        serializer = self.get_serializer(clinicians, many=True)
-        return Response(serializer.data)
+# class ClinicianViewSet(viewsets.ModelViewSet):
+#     queryset = Clinician.objects.select_related('user').all()
+#     serializer_class = ClinicianSerializer
+#     
+#     @action(detail=False, methods=['get'])
+#     def available(self, request):
+#         clinicians = self.queryset.filter(is_available=True)
+#         serializer = self.get_serializer(clinicians, many=True)
+#         return Response(serializer.data)
+#     
+#     @action(detail=False, methods=['get'])
+#     def by_specialization(self, request):
+#         specialization = request.query_params.get('specialization')
+#         if not specialization:
+#             return Response({'error': 'specialization parameter required'}, status=status.HTTP_400_BAD_REQUEST)
+#         
+#         clinicians = self.queryset.filter(specialization__icontains=specialization)
+#         serializer = self.get_serializer(clinicians, many=True)
+#         return Response(serializer.data)
 
 class AppointmentViewSet(viewsets.ModelViewSet):
-    queryset = Appointment.objects.select_related('patient', 'clinician__user').all()
+    queryset = Appointment.objects.select_related('patient').all()
     serializer_class = AppointmentSerializer
     
     def get_queryset(self):
@@ -254,7 +254,7 @@ class AppointmentViewSet(viewsets.ModelViewSet):
         return Response(serializer.data)
 
 class MedicalRecordViewSet(viewsets.ModelViewSet):
-    queryset = MedicalRecord.objects.select_related('patient', 'clinician__user', 'appointment').all()
+    queryset = MedicalRecord.objects.select_related('patient', 'appointment').all()
     serializer_class = MedicalRecordSerializer
     
     def get_queryset(self):
@@ -301,7 +301,7 @@ class MedicalRecordViewSet(viewsets.ModelViewSet):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 class PrescriptionViewSet(viewsets.ModelViewSet):
-    queryset = Prescription.objects.select_related('patient', 'clinician__user', 'medical_record').all()
+    queryset = Prescription.objects.select_related('patient', 'medical_record').all()
     serializer_class = PrescriptionSerializer
     
     def get_queryset(self):

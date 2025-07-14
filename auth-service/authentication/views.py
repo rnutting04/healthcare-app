@@ -8,6 +8,9 @@ from django.utils.decorators import method_decorator
 from django.utils import timezone
 from django.http import Http404
 from django_ratelimit.decorators import ratelimit
+import logging
+
+logger = logging.getLogger(__name__)
 from .serializers import (
     UserSerializer, UserRegistrationSerializer, LoginSerializer,
     RefreshTokenSerializer, ChangePasswordSerializer
@@ -32,11 +35,46 @@ def register(request):
         access_token = generate_access_token(user)
         refresh_token = generate_refresh_token(user)
         
+        # Get the role name from the user's role_detail or role_name
+        role_name = 'patient'  # default
+        if 'role_detail' in user and user['role_detail']:
+            role_name = user['role_detail'].get('name', 'patient').lower()
+        elif 'role_name' in user:
+            role_name = user['role_name'].lower()
+        elif 'role' in serializer.validated_data:
+            # Get role from serializer validated data
+            role_name = serializer.validated_data['role'].lower()
+        else:
+            # Fallback: get from initial data
+            role_name = serializer.initial_data.get('role', 'PATIENT').lower()
+        
+        # If the user is a patient, create a patient profile
+        if role_name == 'patient':
+            try:
+                from .services import DatabaseService
+                # Create patient profile with minimal data
+                patient_data = {
+                    'user_id': user['id'],
+                    'preferred_language_id': 'en',  # Default to English (using code as PK)
+                    # These fields will be filled later by the user
+                    'date_of_birth': '1900-01-01',  # Placeholder
+                    'gender': 'OTHER',  # Placeholder
+                    'phone_number': '',
+                    'address': '',
+                    'emergency_contact_name': '',
+                    'emergency_contact_phone': ''
+                }
+                DatabaseService.create_patient_profile(patient_data)
+                logger.info(f"Created patient profile for user {user['id']}")
+            except Exception as e:
+                logger.error(f"Failed to create patient profile: {e}")
+                # Don't fail the registration if patient profile creation fails
+        
         response = Response({
             'user': UserSerializer(user).data,
             'access_token': access_token,
             'refresh_token': refresh_token,
-            'redirect_url': f'/{user["role"]["name"].lower()}/dashboard'
+            'redirect_url': f'/{role_name}/dashboard'
         }, status=status.HTTP_201_CREATED)
         
         # Set secure cookies for session management

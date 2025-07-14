@@ -93,6 +93,8 @@ class UserRegistrationSerializer(serializers.Serializer):
         
         try:
             user = DatabaseService.create_user(user_data)
+            # Store the role name in validated_data so it can be accessed in the view
+            self.validated_data['role'] = role_name
             return user
         except Exception as e:
             logger.error(f"Failed to create user: {e}")
