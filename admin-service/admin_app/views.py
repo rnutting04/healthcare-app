@@ -292,22 +292,36 @@ def user_detail(request, user_id):
                         headers=headers
                     )
                     # logger.info(f"Languages response status: {languages_response.status_code}")
+                    # logger.info(f"Auth header being sent: {auth_header}")
                     if languages_response.status_code == 200:
                         languages_data = languages_response.json()
+                        # logger.info(f"Languages response data: {languages_data}")
                         # Handle paginated response
-                        languages = languages_data.get('results', languages_data)
+                        # Ensure we're updating the outer scope languages variable
+                        if isinstance(languages_data, list):
+                            languages = languages_data
+                        else:
+                            languages = languages_data.get('results', languages_data)
                         # logger.info(f"Fetched {len(languages)} languages")
+                        # logger.info(f"Languages list: {languages}")
                         
                         # Log the preferred language to debug
                         if patient_data:
                             # logger.info(f"Patient preferred_language value: {patient_data.get('preferred_language')}")
+                            pass
                     else:
                         # logger.warning(f"Failed to fetch languages: {languages_response.status_code}")
+                        # logger.warning(f"Response content: {languages_response.text}")
+                        pass
                 except Exception as e:
                     # logger.warning(f"Could not fetch languages: {str(e)}")
-                    
+                    pass
             except Exception as e:
                 # logger.warning(f"Could not fetch patient data for user {user_id}: {str(e)}")
+                pass
+        
+        # logger.info(f"DEBUG: Languages before context: {languages}")
+        # logger.info(f"DEBUG: Number of languages: {len(languages)}")
         
         context = {
             'user': user_data,  # Template expects 'user'

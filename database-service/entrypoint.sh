@@ -19,6 +19,10 @@ python manage.py migrate data_management 0001_initial --fake-initial --noinput |
 # Then run all remaining migrations
 python manage.py migrate --noinput || true
 
+# Create admin user if it doesn't exist
+echo "Creating admin user..."
+python manage.py create_admin_user
+
 # Start the server
 echo "Starting server..."
 exec "$@"
