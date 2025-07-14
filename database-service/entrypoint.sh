@@ -23,6 +23,10 @@ python manage.py migrate --noinput || true
 echo "Creating admin user..."
 python manage.py create_admin_user
 
+# Import cancer types from JSON file
+echo "Importing cancer types..."
+python manage.py import_cancer_types
+
 # Start the server
 echo "Starting server..."
 exec "$@"

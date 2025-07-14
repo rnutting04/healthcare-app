@@ -100,6 +100,7 @@ services:
         condition: service_healthy
     volumes:
       - ./database-service:/app
+      - ./cancer_types.json:/app/cancer_types.json:ro
 
   admin-service:
     build:
