@@ -209,3 +209,71 @@ def verify_token(request):
         'valid': True,
         'user': UserSerializer(request.user).data
     }, status=status.HTTP_200_OK)
+
+@api_view(['POST'])
+@permission_classes([permissions.AllowAny])
+@authentication_classes([])
+def refresh_if_active(request):
+    """
+    Refresh token if user has been active.
+    This endpoint checks the current token's age and only issues a new token
+    if the token is at least 50% through its lifetime (7.5 minutes old).
+    This prevents constant token regeneration while ensuring active users stay logged in.
+    """
+    from django.conf import settings
+    import jwt
+    
+    # Get token from cookies or header
+    access_token = request.COOKIES.get('access_token')
+    if not access_token:
+        auth_header = request.headers.get('Authorization', '')
+        if auth_header.startswith('Bearer '):
+            access_token = auth_header.split(' ')[1]
+    
+    if not access_token:
+        return Response({'error': 'No token provided'}, status=status.HTTP_401_UNAUTHORIZED)
+    
+    try:
+        # Decode the current token
+        payload = jwt.decode(access_token, settings.JWT_SECRET_KEY, algorithms=[settings.JWT_ALGORITHM])
+        
+        # Check token age
+        iat = payload.get('iat', 0)
+        current_time = timezone.now().timestamp()
+        token_age = current_time - iat
+        token_lifetime = settings.JWT_ACCESS_TOKEN_LIFETIME.total_seconds()
+        
+        # Only refresh if token is at least 50% through its lifetime
+        if token_age < (token_lifetime * 0.5):
+            return Response({
+                'message': 'Token is still fresh',
+                'refreshed': False
+            }, status=status.HTTP_200_OK)
+        
+        # Get user and generate new token
+        user = User.objects.get(id=payload['user_id'])
+        new_access_token = generate_access_token(user)
+        
+        response = Response({
+            'access_token': new_access_token,
+            'refreshed': True,
+            'user': UserSerializer(user).data
+        }, status=status.HTTP_200_OK)
+        
+        # Set the new token in cookies
+        response.set_cookie(
+            'access_token',
+            new_access_token,
+            max_age=settings.JWT_ACCESS_TOKEN_LIFETIME.total_seconds(),
+            httponly=True,
+            samesite='Lax',
+            secure=settings.SECURE_SSL_REDIRECT
+        )
+        
+        return response
+        
+    except jwt.ExpiredSignatureError:
+        # Token has expired, user needs to login again
+        return Response({'error': 'Token has expired'}, status=status.HTTP_401_UNAUTHORIZED)
+    except (jwt.InvalidTokenError, User.DoesNotExist):
+        return Response({'error': 'Invalid token'}, status=status.HTTP_401_UNAUTHORIZED)
