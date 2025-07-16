@@ -21,12 +21,12 @@ COPY . .
 # Create media directory for temporary file storage
 RUN mkdir -p /app/media/temp_files
 
-# Make entrypoint executable
-RUN dos2unix /app/entrypoint.sh
-RUN chmod +x /app/entrypoint.sh
-
 # Expose port
 EXPOSE 8007
 
+# Copy entrypoint script and convert line endings
+COPY --chmod=755 entrypoint.sh /entrypoint.sh
+RUN dos2unix /entrypoint.sh
+
 # Run the entrypoint script
-ENTRYPOINT ["/app/entrypoint.sh"]
+ENTRYPOINT ["/entrypoint.sh"]
