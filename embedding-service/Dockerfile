@@ -8,6 +8,7 @@ WORKDIR /app
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
     netcat-traditional \
+    dos2unix \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements and install Python dependencies
@@ -21,7 +22,7 @@ COPY . .
 RUN mkdir -p /app/media/temp_files
 
 # Make entrypoint executable
-RUN dos2unix /entrypoint.sh
+RUN dos2unix /app/entrypoint.sh
 RUN chmod +x /app/entrypoint.sh
 
 # Expose port
