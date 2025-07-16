@@ -12,9 +12,8 @@ echo "PostgreSQL started"
 echo "Waiting for auth-service to initialize..."
 sleep 10
 
-# Run only app-specific migrations
-echo "Running patient migrations..."
-python manage.py migrate patients --noinput || true
+# No migrations needed for patient service as it doesn't have local models
+echo "Patient service ready (no migrations needed)"
 
 # Start the server
 echo "Starting server..."

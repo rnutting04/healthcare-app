@@ -433,6 +433,49 @@ def document_upload(request):
                                 'file_id': file_id,
                                 'size': file.size
                             })
+                            
+                            # Send file to embedding service
+                            try:
+                                # First, retrieve the unencrypted file from file service
+                                file_url = f"{settings.FILE_SERVICE_URL}/api/files/{file_id}"
+                                file_response = requests.get(file_url, headers=headers)
+                                
+                                if file_response.status_code == 200:
+                                    # Now send to embedding service
+                                    embedding_url = f"{settings.EMBEDDING_SERVICE_URL}/embeddings/process/"
+                                    
+                                    # Get file content and prepare for multipart upload
+                                    file_content = file_response.content
+                                    files_for_embedding = {
+                                        'file': (file.name, file_content, file_response.headers.get('Content-Type', 'application/octet-stream'))
+                                    }
+                                    embedding_data = {
+                                        'document_id': file_id,
+                                        'priority': 1  # Higher priority for admin uploads
+                                    }
+                                    
+                                    embedding_response = requests.post(
+                                        embedding_url,
+                                        files=files_for_embedding,
+                                        data=embedding_data,
+                                        headers={'Authorization': f'Bearer {token}'}
+                                    )
+                                    
+                                    if embedding_response.status_code == 200:
+                                        embedding_result = embedding_response.json()
+                                        uploaded_files[-1]['embedding_status'] = 'queued'
+                                        uploaded_files[-1]['queue_position'] = embedding_result.get('queue_position', 'N/A')
+                                        logger.info(f"File {file_id} queued for embedding processing")
+                                    else:
+                                        logger.error(f"Failed to queue file for embedding: {embedding_response.text}")
+                                        uploaded_files[-1]['embedding_status'] = 'failed'
+                                else:
+                                    logger.error(f"Failed to retrieve file for embedding: {file_response.status_code}")
+                                    uploaded_files[-1]['embedding_status'] = 'failed'
+                                    
+                            except Exception as e:
+                                logger.error(f"Error sending file to embedding service: {str(e)}")
+                                uploaded_files[-1]['embedding_status'] = 'error'
                         else:
                             errors.append(f"Failed to associate {file.name} with cancer type")
                     else:
@@ -541,7 +584,20 @@ def api_delete_rag_document(request, file_id):
             logger.error(f"Failed to delete file from file service: {file_response.status_code}")
             # Continue with database deletion even if file deletion fails
         
-        # Step 2: Delete the RAG document from database service
+        # Step 2: Delete embeddings and chunks from database service
+        embedding_headers = {
+            'X-Service-Token': getattr(settings, 'DATABASE_SERVICE_TOKEN', 'db-service-secret-token')
+        }
+        embedding_response = requests.delete(
+            f"{settings.DATABASE_SERVICE_URL}/api/embeddings/{file_id}/delete/",
+            headers=embedding_headers
+        )
+        
+        if embedding_response.status_code not in [200, 204, 404]:
+            logger.error(f"Failed to delete embeddings from database: {embedding_response.status_code}")
+            # Continue with RAG document deletion even if embedding deletion fails
+        
+        # Step 3: Delete the RAG document from database service
         db_headers = {
             'X-Service-Token': getattr(settings, 'DATABASE_SERVICE_TOKEN', 'db-service-secret-token')
         }
@@ -555,11 +611,38 @@ def api_delete_rag_document(request, file_id):
             logger.error(f"Failed to delete RAG document from database: {db_response.status_code}")
             return JsonResponse({'error': 'Failed to delete document record'}, status=500)
         
-        return JsonResponse({'message': 'Document deleted successfully'})
+        return JsonResponse({'message': 'Document and embeddings deleted successfully'})
         
     except Exception as e:
         logger.error(f"Error deleting RAG document: {str(e)}")
         return JsonResponse({'error': 'Failed to delete document'}, status=500)
+
+# API endpoint for checking embedding status
+def api_embedding_status(request, document_id):
+    """Check embedding status for a specific document"""
+    try:
+        # Get JWT token for authentication
+        token = request.COOKIES.get('access_token')
+        headers = {'Authorization': f'Bearer {token}'}
+        
+        # Check embedding status
+        embedding_url = f"{settings.EMBEDDING_SERVICE_URL}/embeddings/status/{document_id}/"
+        response = requests.get(embedding_url, headers=headers)
+        
+        if response.status_code == 200:
+            return JsonResponse(response.json())
+        else:
+            return JsonResponse({
+                'error': 'Failed to get embedding status',
+                'status': 'unknown'
+            }, status=response.status_code)
+            
+    except Exception as e:
+        logger.error(f"Error checking embedding status: {str(e)}")
+        return JsonResponse({
+            'error': 'Failed to check embedding status',
+            'status': 'error'
+        }, status=500)
 
 # Health check
 def health_check(request):

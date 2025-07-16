@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import User, Role, Patient, Appointment, MedicalRecord, Prescription, EventLog, CancerType, FileMetadata, RAGDocument, Language
+from .models import User, Role, Patient, Appointment, MedicalRecord, Prescription, EventLog, CancerType, FileMetadata, RAGDocument, Language, DocumentEmbedding, EmbeddingChunk
 
 class LanguageSerializer(serializers.ModelSerializer):
     class Meta:
@@ -149,3 +149,21 @@ class RAGDocumentSerializer(serializers.ModelSerializer):
     class Meta:
         model = RAGDocument
         fields = ['file', 'cancer_type', 'cancer_type_name', 'file_data']
+
+
+class EmbeddingChunkSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = EmbeddingChunk
+        fields = ['id', 'chunk_index', 'chunk_text_preview', 'embedding_vector', 'vector_dimension']
+        read_only_fields = ['id']
+
+
+class DocumentEmbeddingSerializer(serializers.ModelSerializer):
+    chunks = EmbeddingChunkSerializer(many=True, read_only=True)
+    file_data = FileMetadataSerializer(source='file', read_only=True)
+    
+    class Meta:
+        model = DocumentEmbedding
+        fields = ['file', 'total_chunks', 'embedding_model', 'processing_status', 
+                  'error_message', 'processed_at', 'chunks', 'file_data']
+        read_only_fields = ['processed_at']

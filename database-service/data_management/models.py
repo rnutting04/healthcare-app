@@ -311,3 +311,56 @@ class RefreshToken(models.Model):
     
     def __str__(self):
         return f"Token for {self.user.email}"
+
+
+class DocumentEmbedding(models.Model):
+    """Links FileMetadata to its embeddings."""
+    file = models.OneToOneField(
+        FileMetadata, 
+        on_delete=models.CASCADE, 
+        primary_key=True, 
+        related_name='embedding'
+    )
+    total_chunks = models.IntegerField()
+    embedding_model = models.CharField(max_length=100)
+    processing_status = models.CharField(max_length=20, choices=[
+        ('queued', 'Queued'),
+        ('processing', 'Processing'),
+        ('completed', 'Completed'),
+        ('failed', 'Failed'),
+    ], default='queued')
+    error_message = models.TextField(null=True, blank=True)
+    processed_at = models.DateTimeField(null=True, blank=True)
+    
+    class Meta:
+        db_table = 'document_embeddings'
+        indexes = [
+            models.Index(fields=['processing_status']),
+        ]
+    
+    def __str__(self):
+        return f"Embeddings for {self.file.filename}"
+
+
+class EmbeddingChunk(models.Model):
+    """Stores individual embedding chunks for a document."""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    document_embedding = models.ForeignKey(
+        DocumentEmbedding, 
+        on_delete=models.CASCADE, 
+        related_name='chunks'
+    )
+    chunk_index = models.IntegerField()
+    chunk_text_preview = models.CharField(max_length=500)  # First 500 chars of chunk
+    embedding_vector = models.TextField()  # JSON serialized embedding vector
+    vector_dimension = models.IntegerField()
+    
+    class Meta:
+        db_table = 'embedding_chunks'
+        unique_together = [['document_embedding', 'chunk_index']]
+        indexes = [
+            models.Index(fields=['document_embedding', 'chunk_index']),
+        ]
+    
+    def __str__(self):
+        return f"Chunk {self.chunk_index} of {self.document_embedding.file.filename}"

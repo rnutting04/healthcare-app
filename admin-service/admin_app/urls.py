@@ -27,6 +27,7 @@ urlpatterns = [
     path('admin/api/cancer-types/', views.api_cancer_types, name='api_cancer_types'),
     path('admin/api/rag-documents/', views.api_rag_documents, name='api_rag_documents'),
     path('admin/api/rag-documents/<str:file_id>/delete/', views.api_delete_rag_document, name='api_delete_rag_document'),
+    path('admin/api/embedding-status/<str:document_id>/', views.api_embedding_status, name='api_embedding_status'),
     
     # Health check
     path('health/', views.health_check, name='health_check'),

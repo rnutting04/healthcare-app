@@ -1,0 +1,30 @@
+# Django and core dependencies
+Django==4.2.7
+djangorestframework==3.14.0
+django-cors-headers==4.3.0
+
+# Authentication
+PyJWT==2.8.0
+
+# OpenAI for embeddings (latest version)
+openai==1.96.1
+
+# Document processing
+PyPDF2==3.0.1
+python-docx==1.1.0
+
+# HTTP requests
+requests==2.31.0
+
+# Data processing
+numpy==1.24.3
+
+# Utilities
+python-decouple==3.8
+python-dotenv==1.0.0
+
+# Logging
+colorlog==6.7.0
+
+# Production server
+gunicorn==21.2.0

@@ -134,6 +134,7 @@ class DatabaseService:
             'clinician-service': settings.CLINICIAN_SERVICE_URL,
             'database-service': settings.DATABASE_SERVICE_URL,
             'file-service': settings.FILE_SERVICE_URL,
+            'embedding-service': settings.EMBEDDING_SERVICE_URL,
             'admin-service': 'http://admin-service:8005'  # Self check
         }
         

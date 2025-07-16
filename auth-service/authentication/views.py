@@ -338,7 +338,9 @@ def refresh_if_active(request):
             }, status=status.HTTP_200_OK)
         
         # Get user and generate new token
-        user = User.objects.get(id=payload['user_id'])
+        user = DatabaseService.get_user_by_id(payload['user_id'])
+        if not user:
+            return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
         new_access_token = generate_access_token(user)
         
         response = Response({

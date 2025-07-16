@@ -278,10 +278,31 @@ document.addEventListener('DOMContentLoaded', function() {
             console.log('Upload response:', data);
             
             if (data.success) {
+                // Build success message with embedding status
+                let successMessage = data.message;
+                
+                // Check if we have embedding status info
+                if (data.uploaded_files && data.uploaded_files.length > 0) {
+                    const embeddingStatuses = data.uploaded_files.map(file => {
+                        if (file.embedding_status === 'queued') {
+                            return `${file.filename}: Queued for embedding (position #${file.queue_position || 'N/A'})`;
+                        } else if (file.embedding_status === 'failed') {
+                            return `${file.filename}: Upload successful but embedding failed`;
+                        } else if (file.embedding_status === 'error') {
+                            return `${file.filename}: Upload successful but embedding error occurred`;
+                        }
+                        return null;
+                    }).filter(status => status !== null);
+                    
+                    if (embeddingStatuses.length > 0) {
+                        successMessage += '<br><br><strong>Embedding Status:</strong><br>' + embeddingStatuses.join('<br>');
+                    }
+                }
+                
                 // Keep modal visible for a moment to show 100% completion
                 setTimeout(() => {
                     uploadProgressModal.classList.add('hidden');
-                    showSuccess(data.message);
+                    showSuccess(successMessage);
                     // Update the documents list after hiding modal
                     updateRecentUploads();
                 }, 1000);
@@ -326,7 +347,7 @@ document.addEventListener('DOMContentLoaded', function() {
     function showSuccess(message) {
         const alert = createAlert(message, 'success');
         document.querySelector('.document-upload-container').insertBefore(alert, document.querySelector('.document-upload-container').firstChild);
-        setTimeout(() => alert.remove(), 5000);
+        setTimeout(() => alert.remove(), 8000); // Increased timeout for longer messages
     }
 
     // Create alert element
@@ -445,8 +466,13 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Render documents in table
     function renderDocuments(documents) {
+        // Render desktop view
         const tableBody = document.getElementById('documentsTableBody');
         tableBody.innerHTML = '';
+        
+        // Render mobile view
+        const mobileView = document.getElementById('documentsMobileView');
+        mobileView.innerHTML = '';
         
         documents.forEach(doc => {
             const row = document.createElement('tr');
@@ -471,6 +497,17 @@ document.addEventListener('DOMContentLoaded', function() {
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                     ${fileType}
                 </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm">
+                    <div class="embedding-status" data-document-id="${doc.file}">
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                            <svg class="animate-spin -ml-0.5 mr-1.5 h-3 w-3 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            Checking...
+                        </span>
+                    </div>
+                </td>
                 <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                     <div class="flex items-center justify-end space-x-3">
                         <button class="text-blue-600 hover:text-blue-900" onclick="downloadDocument('${doc.file}')">
@@ -484,7 +521,56 @@ document.addEventListener('DOMContentLoaded', function() {
             `;
             
             tableBody.appendChild(row);
+            
+            // Create mobile card
+            const mobileCard = document.createElement('div');
+            mobileCard.className = 'bg-white p-4 mb-4 rounded-lg shadow border border-gray-200';
+            mobileCard.innerHTML = `
+                <div class="flex justify-between items-start mb-2">
+                    <h3 class="text-sm font-medium text-gray-900 break-words">${doc.file_data.filename}</h3>
+                    <span class="text-xs text-gray-500 ml-2 flex-shrink-0">${fileType}</span>
+                </div>
+                <div class="space-y-1 text-xs text-gray-600">
+                    <div class="flex justify-between">
+                        <span>Cancer Type:</span>
+                        <span class="font-medium">${doc.cancer_type}</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span>Size:</span>
+                        <span>${fileSize}</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span>Uploaded:</span>
+                        <span>${new Date(doc.file_data.uploaded_at).toLocaleDateString()}</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span>Embedding:</span>
+                        <div class="embedding-status" data-document-id="${doc.file}">
+                            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                                <svg class="animate-spin -ml-0.5 mr-1.5 h-3 w-3 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
+                                Checking...
+                            </span>
+                        </div>
+                    </div>
+                </div>
+                <div class="mt-3 flex gap-2">
+                    <button class="flex-1 text-xs px-3 py-1.5 text-blue-600 bg-blue-50 rounded hover:bg-blue-100" onclick="downloadDocument('${doc.file}')">
+                        Download
+                    </button>
+                    <button class="flex-1 text-xs px-3 py-1.5 text-red-600 bg-red-50 rounded hover:bg-red-100" onclick="deleteDocument('${doc.file}', '${doc.file_data.filename}')">
+                        Delete
+                    </button>
+                </div>
+            `;
+            
+            mobileView.appendChild(mobileCard);
         });
+        
+        // Check embedding status for all documents
+        checkAllEmbeddingStatuses();
     }
     
     // Update pagination controls
@@ -753,4 +839,113 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Make updateRecentUploads available globally if needed
     window.updateRecentUploads = updateRecentUploads;
+    
+    // Check embedding status for all visible documents
+    async function checkAllEmbeddingStatuses() {
+        const statusElements = document.querySelectorAll('.embedding-status');
+        
+        statusElements.forEach(async (element) => {
+            const documentId = element.getAttribute('data-document-id');
+            if (documentId) {
+                await checkEmbeddingStatus(documentId, element);
+            }
+        });
+    }
+    
+    // Check embedding status for a single document
+    async function checkEmbeddingStatus(documentId, statusElement) {
+        try {
+            // Add a subtle pulse effect to indicate checking
+            if (statusElement.querySelector('span')) {
+                statusElement.querySelector('span').style.opacity = '0.7';
+            }
+            
+            const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+            
+            const response = await fetch(`/admin/api/embedding-status/${documentId}/`, {
+                method: 'GET',
+                headers: {
+                    'X-CSRFToken': csrfToken,
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                credentials: 'same-origin'
+            });
+            
+            if (!response.ok) {
+                updateStatusDisplay(statusElement, 'error', 'Failed to check');
+                return;
+            }
+            
+            const data = await response.json();
+            
+            // Update the status display based on the response
+            if (data.status === 'completed') {
+                updateStatusDisplay(statusElement, 'completed', 'Embedded');
+            } else if (data.status === 'processing') {
+                const progressText = data.progress ? `Processing... (${Math.round(data.progress)}%)` : 'Processing...';
+                updateStatusDisplay(statusElement, 'processing', progressText);
+                // Check again in 2 seconds for more frequent updates
+                setTimeout(() => checkEmbeddingStatus(documentId, statusElement), 2000);
+            } else if (data.status === 'queued') {
+                const queueText = data.queue_position ? `Queued (#${data.queue_position})` : 'Queued';
+                updateStatusDisplay(statusElement, 'queued', queueText);
+                // Check again in 3 seconds
+                setTimeout(() => checkEmbeddingStatus(documentId, statusElement), 3000);
+            } else if (data.status === 'failed') {
+                const errorText = data.error ? 'Failed' : 'Failed';
+                updateStatusDisplay(statusElement, 'error', errorText);
+                // Add tooltip with error message if available
+                if (data.error && statusElement.querySelector('span')) {
+                    statusElement.querySelector('span').title = data.error;
+                }
+            } else if (data.status === 'duplicate') {
+                updateStatusDisplay(statusElement, 'duplicate', 'Duplicate');
+                // Add tooltip with error message
+                if (data.error && statusElement.querySelector('span')) {
+                    statusElement.querySelector('span').title = data.error;
+                }
+            } else if (data.status === 'error') {
+                updateStatusDisplay(statusElement, 'error', 'Error');
+            } else {
+                updateStatusDisplay(statusElement, 'pending', 'Pending');
+                // Check again in 3 seconds
+                setTimeout(() => checkEmbeddingStatus(documentId, statusElement), 3000);
+            }
+            
+        } catch (error) {
+            console.error('Error checking embedding status:', error);
+            updateStatusDisplay(statusElement, 'error', 'Error');
+        }
+    }
+    
+    // Update the status display element
+    function updateStatusDisplay(element, status, text) {
+        const statusColors = {
+            'completed': 'bg-green-100 text-green-800',
+            'processing': 'bg-blue-100 text-blue-800',
+            'queued': 'bg-yellow-100 text-yellow-800',
+            'error': 'bg-red-100 text-red-800',
+            'duplicate': 'bg-orange-100 text-orange-800',
+            'pending': 'bg-gray-100 text-gray-800'
+        };
+        
+        const statusIcons = {
+            'completed': '<svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path></svg>',
+            'processing': '<svg class="animate-spin -ml-0.5 mr-1.5 h-3 w-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>',
+            'queued': '<svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd"></path></svg>',
+            'error': '<svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"></path></svg>',
+            'duplicate': '<svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20"><path d="M9 2a2 2 0 00-2 2v8a2 2 0 002 2h6a2 2 0 002-2V6.414A2 2 0 0016.414 5L14 2.586A2 2 0 0012.586 2H9z"></path><path d="M3 8a2 2 0 012-2v10h8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z"></path></svg>',
+            'pending': '<svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd"></path></svg>'
+        };
+        
+        const colorClass = statusColors[status] || statusColors['pending'];
+        const icon = statusIcons[status] || statusIcons['pending'];
+        
+        element.innerHTML = `
+            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${colorClass} transition-opacity duration-200" style="opacity: 1">
+                ${icon}
+                ${text}
+            </span>
+        `;
+    }
 });

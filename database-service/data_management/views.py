@@ -7,12 +7,13 @@ from django.conf import settings
 from django.db.models import Q
 from django.utils import timezone
 from datetime import datetime, timedelta
-from .models import User, Role, Patient, Appointment, MedicalRecord, Prescription, EventLog, CancerType, UserEncryptionKey, FileMetadata, FileAccessLog, RAGDocument, RefreshToken, Language
+from .models import User, Role, Patient, Appointment, MedicalRecord, Prescription, EventLog, CancerType, UserEncryptionKey, FileMetadata, FileAccessLog, RAGDocument, RefreshToken, Language, DocumentEmbedding, EmbeddingChunk
 from .serializers import (
     UserSerializer, PatientSerializer,
     AppointmentSerializer, MedicalRecordSerializer, PrescriptionSerializer,
     EventLogSerializer, MedicalRecordCreateSerializer, CancerTypeSerializer,
-    FileMetadataSerializer, RAGDocumentSerializer, LanguageSerializer
+    FileMetadataSerializer, RAGDocumentSerializer, LanguageSerializer,
+    DocumentEmbeddingSerializer, EmbeddingChunkSerializer
 )
 
 
@@ -280,11 +281,11 @@ class MedicalRecordViewSet(viewsets.ModelViewSet):
             
             try:
                 patient = Patient.objects.get(user_id=data['patient_id'])
-                clinician = Clinician.objects.get(user_id=data['clinician_id'])
                 
                 medical_record = MedicalRecord.objects.create(
                     patient=patient,
-                    clinician=clinician,
+                    clinician_id=data['clinician_id'],
+                    clinician_name=data.get('clinician_name', ''),
                     record_type=data['record_type'],
                     title=data['title'],
                     description=data['description'],
@@ -295,7 +296,7 @@ class MedicalRecordViewSet(viewsets.ModelViewSet):
                 response_serializer = MedicalRecordSerializer(medical_record)
                 return Response(response_serializer.data, status=status.HTTP_201_CREATED)
                 
-            except (Patient.DoesNotExist, Clinician.DoesNotExist) as e:
+            except Patient.DoesNotExist as e:
                 return Response({'error': str(e)}, status=status.HTTP_404_NOT_FOUND)
         
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
@@ -353,7 +354,7 @@ def statistics(request):
     stats = {
         'total_users': User.objects.count(),
         'total_patients': Patient.objects.count(),
-        'total_clinicians': Clinician.objects.count(),
+        'total_clinicians': User.objects.filter(role__name='CLINICIAN').count(),
         'total_appointments': Appointment.objects.count(),
         'upcoming_appointments': Appointment.objects.filter(
             appointment_date__gte=timezone.now(),
@@ -805,3 +806,224 @@ class RefreshTokenViewSet(viewsets.ModelViewSet):
             'message': f'Deleted {count} expired tokens',
             'count': count
         })
+
+
+class DocumentEmbeddingViewSet(viewsets.ModelViewSet):
+    queryset = DocumentEmbedding.objects.select_related('file').all()
+    serializer_class = DocumentEmbeddingSerializer
+    
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        
+        # Filter by processing status
+        status = self.request.query_params.get('status')
+        if status:
+            queryset = queryset.filter(processing_status=status)
+        
+        # Filter by embedding model
+        model = self.request.query_params.get('model')
+        if model:
+            queryset = queryset.filter(embedding_model=model)
+        
+        return queryset.order_by('-file__uploaded_at')
+    
+    @action(detail=False, methods=['get'])
+    def by_file(self, request):
+        """Get embedding by file ID"""
+        file_id = request.query_params.get('file_id')
+        if not file_id:
+            return Response({'error': 'file_id parameter required'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            embedding = DocumentEmbedding.objects.select_related('file').get(file_id=file_id)
+            serializer = self.get_serializer(embedding)
+            return Response(serializer.data)
+        except DocumentEmbedding.DoesNotExist:
+            return Response({'error': 'Embedding not found'}, status=status.HTTP_404_NOT_FOUND)
+    
+    @action(detail=False, methods=['post'])
+    def create_embedding(self, request):
+        """Create a new document embedding record"""
+        file_id = request.data.get('file_id')
+        model = request.data.get('embedding_model', 'text-embedding-ada-002')
+        
+        if not file_id:
+            return Response({'error': 'file_id is required'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            file_metadata = FileMetadata.objects.get(id=file_id)
+            
+            # Check if embedding already exists
+            if DocumentEmbedding.objects.filter(file=file_metadata).exists():
+                return Response({'error': 'Embedding already exists for this file'}, status=status.HTTP_409_CONFLICT)
+            
+            embedding = DocumentEmbedding.objects.create(
+                file=file_metadata,
+                total_chunks=0,
+                embedding_model=model,
+                processing_status='queued'
+            )
+            
+            serializer = self.get_serializer(embedding)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+            
+        except FileMetadata.DoesNotExist:
+            return Response({'error': 'File not found'}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
+    @action(detail=True, methods=['patch'])
+    def update_status(self, request, pk=None):
+        """Update embedding processing status"""
+        embedding = self.get_object()
+        
+        new_status = request.data.get('status')
+        if new_status not in ['queued', 'processing', 'completed', 'failed']:
+            return Response({'error': 'Invalid status'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        embedding.processing_status = new_status
+        
+        if new_status == 'completed':
+            embedding.processed_at = timezone.now()
+            embedding.error_message = None
+        elif new_status == 'failed':
+            embedding.error_message = request.data.get('error_message', 'Unknown error')
+        
+        if 'total_chunks' in request.data:
+            embedding.total_chunks = request.data['total_chunks']
+        
+        embedding.save()
+        
+        serializer = self.get_serializer(embedding)
+        return Response(serializer.data)
+    
+    @action(detail=False, methods=['get'])
+    def pending_embeddings(self, request):
+        """Get all files that need embedding processing"""
+        # Get files that don't have embeddings yet
+        files_without_embeddings = FileMetadata.objects.filter(
+            is_deleted=False,
+            embedding__isnull=True
+        ).values_list('id', flat=True)
+        
+        # Get files with failed embeddings that can be retried
+        failed_embeddings = DocumentEmbedding.objects.filter(
+            processing_status='failed'
+        ).values_list('file_id', flat=True)
+        
+        # Combine the lists
+        all_file_ids = list(set(list(files_without_embeddings) + list(failed_embeddings)))
+        
+        # Get file metadata
+        files = FileMetadata.objects.filter(id__in=all_file_ids).order_by('-uploaded_at')
+        
+        data = [{
+            'file_id': str(file.id),
+            'filename': file.filename,
+            'mime_type': file.mime_type,
+            'file_size': file.file_size,
+            'uploaded_at': file.uploaded_at,
+            'has_failed_embedding': file.id in failed_embeddings
+        } for file in files]
+        
+        return Response(data)
+
+
+class EmbeddingChunkViewSet(viewsets.ModelViewSet):
+    queryset = EmbeddingChunk.objects.select_related('document_embedding', 'document_embedding__file').all()
+    serializer_class = EmbeddingChunkSerializer
+    
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        
+        # Filter by document embedding
+        doc_embedding_id = self.request.query_params.get('document_embedding_id')
+        if doc_embedding_id:
+            queryset = queryset.filter(document_embedding__file_id=doc_embedding_id)
+        
+        # Filter by file
+        file_id = self.request.query_params.get('file_id')
+        if file_id:
+            queryset = queryset.filter(document_embedding__file_id=file_id)
+        
+        return queryset.order_by('chunk_index')
+    
+    @action(detail=False, methods=['post'])
+    def create_chunks(self, request):
+        """Create multiple embedding chunks at once"""
+        file_id = request.data.get('file_id')
+        chunks_data = request.data.get('chunks', [])
+        
+        if not file_id or not chunks_data:
+            return Response({'error': 'file_id and chunks are required'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            # Get the document embedding
+            doc_embedding = DocumentEmbedding.objects.get(file_id=file_id)
+            
+            # Create chunks
+            created_chunks = []
+            for chunk_data in chunks_data:
+                chunk = EmbeddingChunk.objects.create(
+                    document_embedding=doc_embedding,
+                    chunk_index=chunk_data['chunk_index'],
+                    chunk_text_preview=chunk_data.get('chunk_text_preview', '')[:500],
+                    embedding_vector=chunk_data['embedding_vector'],
+                    vector_dimension=chunk_data['vector_dimension']
+                )
+                created_chunks.append(chunk)
+            
+            # Update total chunks count
+            doc_embedding.total_chunks = len(chunks_data)
+            doc_embedding.save()
+            
+            serializer = self.get_serializer(created_chunks, many=True)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+            
+        except DocumentEmbedding.DoesNotExist:
+            return Response({'error': 'Document embedding not found'}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
+    @action(detail=False, methods=['post'])
+    def search_similar(self, request):
+        """Search for similar chunks using vector similarity"""
+        query_vector = request.data.get('query_vector')
+        cancer_type_id = request.data.get('cancer_type_id')
+        limit = request.data.get('limit', 10)
+        
+        if not query_vector:
+            return Response({'error': 'query_vector is required'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # This is a placeholder for vector similarity search
+        # In a real implementation, you would use a vector database like pgvector or a separate service
+        # For now, return a sample response structure
+        return Response({
+            'message': 'Vector similarity search not yet implemented',
+            'query_vector_dimension': len(query_vector) if isinstance(query_vector, list) else 0,
+            'cancer_type_id': cancer_type_id,
+            'limit': limit,
+            'results': []
+        })
+    
+    @action(detail=False, methods=['delete'])
+    def delete_by_file(self, request):
+        """Delete all chunks for a specific file"""
+        file_id = request.query_params.get('file_id')
+        if not file_id:
+            return Response({'error': 'file_id parameter required'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            # Delete all chunks for this file
+            count, _ = EmbeddingChunk.objects.filter(document_embedding__file_id=file_id).delete()
+            
+            # Delete the document embedding record
+            DocumentEmbedding.objects.filter(file_id=file_id).delete()
+            
+            return Response({
+                'message': f'Deleted {count} chunks for file',
+                'file_id': file_id,
+                'chunks_deleted': count
+            })
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
