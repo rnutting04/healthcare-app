@@ -362,5 +362,7 @@ def refresh_if_active(request):
     except jwt.ExpiredSignatureError:
         # Token has expired, user needs to login again
         return Response({'error': 'Token has expired'}, status=status.HTTP_401_UNAUTHORIZED)
-    except (jwt.InvalidTokenError, User.DoesNotExist):
+    except jwt.InvalidTokenError:
+        return Response({'error': 'Invalid token'}, status=status.HTTP_401_UNAUTHORIZED)
+    except Exception:
         return Response({'error': 'Invalid token'}, status=status.HTTP_401_UNAUTHORIZED)

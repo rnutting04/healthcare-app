@@ -7,6 +7,7 @@
     <title>{% block title %}{% trans "Healthcare Portal" %}{% endblock %}</title>
     {% load static %}
     {% now "U" as current_timestamp %}
+    <link rel="icon" href="{% static 'img/favicon.ico' %}" type="image/x-icon">
     <link href="{% static 'css/main.css' %}?v={{ current_timestamp }}" rel="stylesheet">
     <script src="https://cdn.tailwindcss.com"></script>
     {% block extra_head %}{% endblock %}

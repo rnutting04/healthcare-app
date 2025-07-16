@@ -48,7 +48,10 @@
             
             return response.ok;
         } catch (error) {
-            console.error('Error refreshing token:', error);
+            // Don't log abort errors - these happen when the page is navigating away
+            if (error.name !== 'AbortError') {
+                console.error('Error refreshing token:', error);
+            }
             return false;
         }
     }

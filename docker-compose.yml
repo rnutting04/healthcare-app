@@ -37,6 +37,9 @@ services:
       - SECRET_KEY=${SECRET_KEY:-your-secret-key-here}
       - DEBUG=${DEBUG:-True}
       - ALLOWED_HOSTS=${ALLOWED_HOSTS:-*}
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-your-secret-key-here}
+      - JWT_ACCESS_TOKEN_LIFETIME=${JWT_ACCESS_TOKEN_LIFETIME:-15}
+      - JWT_REFRESH_TOKEN_LIFETIME=${JWT_REFRESH_TOKEN_LIFETIME:-1440}
     depends_on:
       postgres:
         condition: service_healthy
@@ -57,6 +60,7 @@ services:
       - SECRET_KEY=${SECRET_KEY:-your-secret-key-here}
       - DEBUG=${DEBUG:-True}
       - ALLOWED_HOSTS=${ALLOWED_HOSTS:-*}
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-your-secret-key-here}
     depends_on:
       - database-service
       - auth-service
@@ -75,6 +79,7 @@ services:
       - SECRET_KEY=${SECRET_KEY:-your-secret-key-here}
       - DEBUG=${DEBUG:-True}
       - ALLOWED_HOSTS=${ALLOWED_HOSTS:-*}
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-your-secret-key-here}
     depends_on:
       - database-service
       - auth-service
@@ -93,6 +98,7 @@ services:
       - SECRET_KEY=${SECRET_KEY:-your-secret-key-here}
       - DEBUG=${DEBUG:-True}
       - ALLOWED_HOSTS=${ALLOWED_HOSTS:-*}
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-your-secret-key-here}
     depends_on:
       postgres:
         condition: service_healthy
@@ -116,6 +122,7 @@ services:
       - SECRET_KEY=${SECRET_KEY:-your-secret-key-here}
       - DEBUG=${DEBUG:-True}
       - ALLOWED_HOSTS=${ALLOWED_HOSTS:-*}
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-your-secret-key-here}
     depends_on:
       - database-service
       - auth-service
