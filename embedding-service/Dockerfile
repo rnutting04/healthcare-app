@@ -21,6 +21,7 @@ COPY . .
 RUN mkdir -p /app/media/temp_files
 
 # Make entrypoint executable
+RUN dos2unix /entrypoint.sh
 RUN chmod +x /app/entrypoint.sh
 
 # Expose port
