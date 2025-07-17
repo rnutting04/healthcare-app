@@ -177,3 +177,144 @@ services:
           type: web
           name: healthcare-database-service
           property: host
+      - key: ADMIN_SERVICE_URL
+        fromService:
+          type: web
+          name: healthcare-admin-service
+          property: host
+      - key: FILE_SERVICE_URL
+        fromService:
+          type: web
+          name: healthcare-file-service
+          property: host
+      - key: EMBEDDING_SERVICE_URL
+        fromService:
+          type: web
+          name: healthcare-embedding-service
+          property: host
+
+  # Admin Service
+  - type: web
+    name: healthcare-admin-service
+    env: python
+    plan: starter
+    buildCommand: |
+      cd admin-service &&
+      pip install -r requirements.txt &&
+      python manage.py migrate &&
+      python manage.py collectstatic --noinput
+    startCommand: |
+      cd admin-service &&
+      gunicorn admin_service.wsgi:application --bind 0.0.0.0:$PORT
+    envVars:
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DEBUG
+        value: false
+      - key: ALLOWED_HOSTS
+        value: .onrender.com,localhost
+      - key: DATABASE_URL
+        fromDatabase:
+          name: healthcare-db
+          property: connectionString
+      - key: AUTH_SERVICE_URL
+        fromService:
+          type: web
+          name: healthcare-auth-service
+          property: host
+      - key: DATABASE_SERVICE_URL
+        fromService:
+          type: web
+          name: healthcare-database-service
+          property: host
+      - key: JWT_SECRET_KEY
+        sync: false
+      - key: PORT
+        value: 8005
+
+  # File Service
+  - type: web
+    name: healthcare-file-service
+    env: python
+    plan: starter
+    buildCommand: |
+      cd file-service &&
+      pip install -r requirements.txt &&
+      python manage.py migrate &&
+      python manage.py collectstatic --noinput
+    startCommand: |
+      cd file-service &&
+      gunicorn file_service.wsgi:application --bind 0.0.0.0:$PORT
+    envVars:
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DEBUG
+        value: false
+      - key: ALLOWED_HOSTS
+        value: .onrender.com,localhost
+      - key: DATABASE_URL
+        fromDatabase:
+          name: healthcare-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: healthcare-redis
+          property: connectionString
+      - key: AUTH_SERVICE_URL
+        fromService:
+          type: web
+          name: healthcare-auth-service
+          property: host
+      - key: DATABASE_SERVICE_URL
+        fromService:
+          type: web
+          name: healthcare-database-service
+          property: host
+      - key: JWT_SECRET_KEY
+        sync: false
+      - key: FILE_ENCRYPTION_KEY
+        generateValue: true
+      - key: PORT
+        value: 8006
+
+  # Embedding Service
+  - type: web
+    name: healthcare-embedding-service
+    env: python
+    plan: starter
+    buildCommand: |
+      cd embedding-service &&
+      pip install -r requirements.txt &&
+      python manage.py migrate &&
+      python manage.py collectstatic --noinput
+    startCommand: |
+      cd embedding-service &&
+      gunicorn embedding.wsgi:application --bind 0.0.0.0:$PORT
+    envVars:
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DEBUG
+        value: false
+      - key: ALLOWED_HOSTS
+        value: .onrender.com,localhost
+      - key: DATABASE_URL
+        fromDatabase:
+          name: healthcare-db
+          property: connectionString
+      - key: AUTH_SERVICE_URL
+        fromService:
+          type: web
+          name: healthcare-auth-service
+          property: host
+      - key: DATABASE_SERVICE_URL
+        fromService:
+          type: web
+          name: healthcare-database-service
+          property: host
+      - key: JWT_SECRET_KEY
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: PORT
+        value: 8007
