@@ -155,6 +155,16 @@ JWT_REFRESH_TOKEN_LIFETIME = timedelta(minutes=config('JWT_REFRESH_TOKEN_LIFETIM
 CORS_ALLOWED_ORIGINS = config('CORS_ALLOWED_ORIGINS', default='http://localhost,http://127.0.0.1').split(',')
 CORS_ALLOW_CREDENTIALS = True
 
+# CSRF settings for proxy
+CSRF_TRUSTED_ORIGINS = config('CSRF_TRUSTED_ORIGINS', default='').split(',')
+if CSRF_TRUSTED_ORIGINS == ['']:
+    CSRF_TRUSTED_ORIGINS = []
+
+# Trust X-Forwarded headers from proxy
+USE_X_FORWARDED_HOST = config('USE_X_FORWARDED_HOST', default=True, cast=bool)
+USE_X_FORWARDED_PORT = config('USE_X_FORWARDED_PORT', default=True, cast=bool)
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+
 # Security settings
 SECURE_BROWSER_XSS_FILTER = True
 SECURE_CONTENT_TYPE_NOSNIFF = True
