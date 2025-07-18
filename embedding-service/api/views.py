@@ -86,7 +86,7 @@ class ProcessEmbeddingView(APIView):
             return Response({
                 'message': 'File submitted for embedding processing',
                 'document_id': document_id,
-                'queue_position': queue_manager.queue.qsize(),
+                'queue_position': queue_manager.get_queue_size(),
                 'status': task.to_dict()
             }, status=status.HTTP_202_ACCEPTED)
             

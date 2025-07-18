@@ -91,6 +91,12 @@ class QueueManager:
                 'total_chunks_processed': 0,
                 'average_processing_time': 0
             }
+            
+            # Log which queue backend is being used
+            if self.use_redis:
+                logger.info("=== Using REDIS queue backend for embedding tasks ===")
+            else:
+                logger.info("=== Using IN-MEMORY queue backend for embedding tasks ===")
     
     def start(self):
         """Start the queue workers."""
@@ -121,6 +127,13 @@ class QueueManager:
         
         self.workers = []
         logger.info("Stopped all embedding workers")
+    
+    def get_queue_size(self) -> int:
+        """Get the current queue size."""
+        if self.use_redis:
+            return self.redis_client.zcard(settings.REDIS_QUEUE_KEY)
+        else:
+            return self.queue.qsize()
     
     def add_task(self, document_id: str, file_path: str, file_type: str, 
                  user_id: str, priority: int = 0) -> EmbeddingTask:
