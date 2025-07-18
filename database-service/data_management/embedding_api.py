@@ -23,6 +23,12 @@ def check_hash_exists(request):
     # Check if embeddings already exist for this file hash
     # Since file_hash is in FileMetadata model, we need to access it through the file relationship
     exists = DocumentEmbedding.objects.filter(file__file_hash=file_hash).exists()
+    
+    # Log for debugging
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.debug(f"Checking hash {file_hash}: exists={exists}")
+    
     return Response({'exists': exists})
 
 

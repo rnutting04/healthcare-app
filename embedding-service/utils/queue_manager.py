@@ -95,6 +95,7 @@ class QueueManager:
             # Log which queue backend is being used
             if self.use_redis:
                 logger.info("=== Using REDIS queue backend for embedding tasks ===")
+                logger.info(f"Redis URL: {settings.REDIS_URL.split('@')[1] if '@' in settings.REDIS_URL else 'localhost'}")
             else:
                 logger.info("=== Using IN-MEMORY queue backend for embedding tasks ===")
     
