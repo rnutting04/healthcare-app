@@ -3,6 +3,8 @@ import queue
 import logging
 import time
 import os
+import json
+import redis
 from typing import Dict, Optional, Any, List
 from datetime import datetime
 from django.conf import settings
@@ -63,7 +65,17 @@ class QueueManager:
     
     def __init__(self):
         if not hasattr(self, 'initialized'):
-            self.queue = queue.Queue()
+            # Initialize Redis connection
+            try:
+                self.redis_client = redis.from_url(settings.REDIS_URL, decode_responses=True)
+                self.redis_client.ping()
+                logger.info("Redis connection established successfully")
+                self.use_redis = True
+            except (redis.ConnectionError, AttributeError) as e:
+                logger.warning(f"Redis not available, falling back to in-memory queue: {str(e)}")
+                self.use_redis = False
+                self.queue = queue.Queue()
+            
             self.active_tasks = {}
             self.completed_tasks = {}
             self.failed_tasks = {}
@@ -123,57 +135,120 @@ class QueueManager:
             logger.info(f"Document {document_id} already has embeddings, skipping")
             return task
         
-        self.queue.put(task)
-        logger.info(f"Added task to queue: document_id={document_id}, queue_size={self.queue.qsize()}, running={self.running}, workers={len(self.workers)}")
+        if self.use_redis:
+            # Add to Redis queue
+            task_dict = task.to_dict()
+            task_json = json.dumps(task_dict)
+            # Use priority for scoring (higher priority = lower score = processed first)
+            score = time.time() - (priority * 1000)
+            self.redis_client.zadd(settings.REDIS_QUEUE_KEY, {task_json: score})
+            queue_size = self.redis_client.zcard(settings.REDIS_QUEUE_KEY)
+        else:
+            # Add to in-memory queue
+            self.queue.put(task)
+            queue_size = self.queue.qsize()
+        
+        logger.info(f"Added task to {'Redis' if self.use_redis else 'in-memory'} queue: document_id={document_id}, queue_size={queue_size}, running={self.running}, workers={len(self.workers)}")
         
         return task
     
     def get_task_status(self, document_id: str) -> Optional[Dict[str, Any]]:
         """Get the status of a specific task."""
-        # Check active tasks
-        if document_id in self.active_tasks:
-            return self.active_tasks[document_id].to_dict()
-        
-        # Check completed tasks
-        if document_id in self.completed_tasks:
-            return self.completed_tasks[document_id].to_dict()
-        
-        # Check failed tasks
-        if document_id in self.failed_tasks:
-            return self.failed_tasks[document_id].to_dict()
-        
-        # Check queue
-        for task in list(self.queue.queue):
-            if task.document_id == document_id:
-                return task.to_dict()
+        if self.use_redis:
+            # Check in Redis
+            # Check processing
+            task_json = self.redis_client.hget(settings.REDIS_PROCESSING_KEY, document_id)
+            if task_json:
+                return json.loads(task_json)
+            
+            # Check completed
+            task_json = self.redis_client.hget(settings.REDIS_COMPLETED_KEY, document_id)
+            if task_json:
+                return json.loads(task_json)
+            
+            # Check failed
+            task_json = self.redis_client.hget(settings.REDIS_FAILED_KEY, document_id)
+            if task_json:
+                return json.loads(task_json)
+            
+            # Check queue
+            queue_items = self.redis_client.zrange(settings.REDIS_QUEUE_KEY, 0, -1)
+            for item in queue_items:
+                task = json.loads(item)
+                if task['document_id'] == document_id:
+                    return task
+        else:
+            # Check in-memory storage
+            # Check active tasks
+            if document_id in self.active_tasks:
+                return self.active_tasks[document_id].to_dict()
+            
+            # Check completed tasks
+            if document_id in self.completed_tasks:
+                return self.completed_tasks[document_id].to_dict()
+            
+            # Check failed tasks
+            if document_id in self.failed_tasks:
+                return self.failed_tasks[document_id].to_dict()
+            
+            # Check queue
+            for task in list(self.queue.queue):
+                if task.document_id == document_id:
+                    return task.to_dict()
         
         return None
     
     def get_queue_status(self) -> Dict[str, Any]:
         """Get overall queue status."""
-        return {
-            'queue_size': self.queue.qsize(),
-            'active_tasks': len(self.active_tasks),
-            'completed_tasks': len(self.completed_tasks),
-            'failed_tasks': len(self.failed_tasks),
-            'workers': len(self.workers),
-            'running': self.running,
-            'stats': self.stats
-        }
+        if self.use_redis:
+            return {
+                'queue_size': self.redis_client.zcard(settings.REDIS_QUEUE_KEY),
+                'active_tasks': self.redis_client.hlen(settings.REDIS_PROCESSING_KEY),
+                'completed_tasks': self.redis_client.hlen(settings.REDIS_COMPLETED_KEY),
+                'failed_tasks': self.redis_client.hlen(settings.REDIS_FAILED_KEY),
+                'workers': len(self.workers),
+                'running': self.running,
+                'stats': self.stats,
+                'backend': 'redis'
+            }
+        else:
+            return {
+                'queue_size': self.queue.qsize(),
+                'active_tasks': len(self.active_tasks),
+                'completed_tasks': len(self.completed_tasks),
+                'failed_tasks': len(self.failed_tasks),
+                'workers': len(self.workers),
+                'running': self.running,
+                'stats': self.stats,
+                'backend': 'in-memory'
+            }
     
     def get_queue_items(self) -> List[Dict[str, Any]]:
         """Get all items currently in the queue."""
         items = []
         
-        # Add queued items
-        for task in list(self.queue.queue):
-            task_dict = task.to_dict()
-            task_dict['position'] = len(items) + 1
-            items.append(task_dict)
-        
-        # Add active items
-        for task in self.active_tasks.values():
-            items.append(task.to_dict())
+        if self.use_redis:
+            # Add queued items from Redis
+            queue_items = self.redis_client.zrange(settings.REDIS_QUEUE_KEY, 0, -1)
+            for i, item in enumerate(queue_items):
+                task = json.loads(item)
+                task['position'] = i + 1
+                items.append(task)
+            
+            # Add processing items from Redis
+            processing_items = self.redis_client.hgetall(settings.REDIS_PROCESSING_KEY)
+            for doc_id, task_json in processing_items.items():
+                items.append(json.loads(task_json))
+        else:
+            # Add queued items from memory
+            for task in list(self.queue.queue):
+                task_dict = task.to_dict()
+                task_dict['position'] = len(items) + 1
+                items.append(task_dict)
+            
+            # Add active items from memory
+            for task in self.active_tasks.values():
+                items.append(task.to_dict())
         
         return items
     
@@ -184,23 +259,58 @@ class QueueManager:
         loop_count = 0
         while self.running:
             loop_count += 1
-            if loop_count % 10 == 0:  # Log every 10 loops
-                logger.debug(f"Worker {worker_id} alive, loop {loop_count}, queue size: {self.queue.qsize()}, running: {self.running}")
             
             try:
-                # Get task from queue with timeout
-                logger.debug(f"Worker {worker_id} trying to get task from queue")
-                task = self.queue.get(timeout=1)
-                logger.info(f"Worker {worker_id} GOT TASK: {task.document_id} - STARTING PROCESSING")
-                
-                # Move to active tasks
-                self.active_tasks[task.document_id] = task
+                if self.use_redis:
+                    # Get task from Redis queue (blocking pop with timeout)
+                    result = self.redis_client.bzpopmin(settings.REDIS_QUEUE_KEY, timeout=1)
+                    
+                    if result is None:
+                        continue
+                    
+                    _, task_json, _ = result
+                    task_dict = json.loads(task_json)
+                    
+                    # Recreate EmbeddingTask from dict
+                    task = EmbeddingTask(
+                        document_id=task_dict['document_id'],
+                        file_path=task_dict['file_path'],
+                        file_type=task_dict['file_type'],
+                        user_id=task_dict['user_id'],
+                        priority=task_dict.get('priority', 0)
+                    )
+                    task.status = task_dict.get('status', 'queued')
+                    task.progress = task_dict.get('progress', 0)
+                    
+                    logger.info(f"Worker {worker_id} GOT TASK from Redis: {task.document_id} - STARTING PROCESSING")
+                    
+                    # Store in Redis processing hash
+                    task_dict['status'] = 'processing'
+                    task_dict['started_at'] = datetime.utcnow().isoformat()
+                    task_dict['worker_id'] = worker_id
+                    self.redis_client.hset(
+                        settings.REDIS_PROCESSING_KEY,
+                        task.document_id,
+                        json.dumps(task_dict)
+                    )
+                else:
+                    # Get task from in-memory queue
+                    # if loop_count % 10 == 0:  # Log every 10 loops
+                    #     logger.debug(f"Worker {worker_id} alive, loop {loop_count}, queue size: {self.queue.qsize()}, running: {self.running}")
+                    
+                    # logger.debug(f"Worker {worker_id} trying to get task from queue")
+                    task = self.queue.get(timeout=1)
+                    logger.info(f"Worker {worker_id} GOT TASK: {task.document_id} - STARTING PROCESSING")
+                    
+                    # Move to active tasks
+                    self.active_tasks[task.document_id] = task
                 
                 # Process the task
                 self._process_task(task, worker_id)
                 
-                # Mark task as done
-                self.queue.task_done()
+                # Mark task as done (only for in-memory queue)
+                if not self.use_redis:
+                    self.queue.task_done()
                 
             except queue.Empty:
                 continue
@@ -208,6 +318,20 @@ class QueueManager:
                 logger.error(f"Worker {worker_id} error: {str(e)}", exc_info=True)
         
         logger.info(f"Worker {worker_id} stopped, final loop count: {loop_count}, self.running = {self.running}")
+    
+    def _update_task_progress_redis(self, document_id: str, progress: int):
+        """Update task progress in Redis."""
+        if self.use_redis:
+            task_json = self.redis_client.hget(settings.REDIS_PROCESSING_KEY, document_id)
+            if task_json:
+                task = json.loads(task_json)
+                task['progress'] = progress
+                task['updated_at'] = datetime.utcnow().isoformat()
+                self.redis_client.hset(
+                    settings.REDIS_PROCESSING_KEY,
+                    document_id,
+                    json.dumps(task)
+                )
     
     def _process_task(self, task: EmbeddingTask, worker_id: int):
         """Process a single embedding task."""
@@ -226,6 +350,8 @@ class QueueManager:
             
             # Process document
             task.progress = 10
+            if self.use_redis:
+                self._update_task_progress_redis(task.document_id, task.progress)
             logger.info(f"Starting document processing for {task.document_id}")
             file_hash, text_chunks, full_text = self.document_processor.process_document(
                 task.file_path, task.file_type
@@ -240,6 +366,8 @@ class QueueManager:
             
             # Generate embeddings
             task.progress = 30
+            if self.use_redis:
+                self._update_task_progress_redis(task.document_id, task.progress)
             embeddings = self.embedding_generator.generate_embeddings_batch(text_chunks)
             
             # Calculate overall progress based on embeddings generated
@@ -247,9 +375,13 @@ class QueueManager:
             for i, embedding in enumerate(embeddings):
                 if embedding is not None:
                     task.progress = 30 + int((i + 1) / total_chunks * 50)
+                    if self.use_redis and i % 5 == 0:  # Update Redis every 5 chunks
+                        self._update_task_progress_redis(task.document_id, task.progress)
             
             # Store embeddings in database
             task.progress = 80
+            if self.use_redis:
+                self._update_task_progress_redis(task.document_id, task.progress)
             success = self.db_client.store_embeddings(
                 document_id=task.document_id,
                 file_hash=file_hash,
@@ -304,9 +436,22 @@ class QueueManager:
             # Update stats
             self.stats['total_failed'] += 1
             
-            # Move to failed tasks
-            del self.active_tasks[task.document_id]
-            self.failed_tasks[task.document_id] = task
+            if self.use_redis:
+                # Move from processing to failed in Redis
+                task_dict = task.to_dict()
+                self.redis_client.hdel(settings.REDIS_PROCESSING_KEY, task.document_id)
+                self.redis_client.hset(
+                    settings.REDIS_FAILED_KEY,
+                    task.document_id,
+                    json.dumps(task_dict)
+                )
+                # Set expiry for failed task
+                self.redis_client.expire(settings.REDIS_FAILED_KEY, settings.REDIS_TASK_TTL)
+            else:
+                # Move to failed tasks in memory
+                if task.document_id in self.active_tasks:
+                    del self.active_tasks[task.document_id]
+                self.failed_tasks[task.document_id] = task
             
             # Optionally delete the file on failure (based on error type)
             if 'duplicate' not in str(e).lower():

@@ -160,6 +160,14 @@ MAX_CONCURRENT_EMBEDDINGS = int(os.environ.get('MAX_CONCURRENT_EMBEDDINGS', '3')
 EMBEDDING_RETRY_MAX_ATTEMPTS = int(os.environ.get('EMBEDDING_RETRY_MAX_ATTEMPTS', '3'))
 EMBEDDING_RETRY_DELAY = int(os.environ.get('EMBEDDING_RETRY_DELAY', '60'))  # seconds
 
+# Redis settings
+REDIS_URL = os.environ.get('REDIS_URL', 'redis://localhost:6379/0')
+REDIS_QUEUE_KEY = 'embedding_queue'
+REDIS_PROCESSING_KEY = 'embedding_processing'
+REDIS_COMPLETED_KEY = 'embedding_completed'
+REDIS_FAILED_KEY = 'embedding_failed'
+REDIS_TASK_TTL = 86400  # 24 hours
+
 # File settings
 TEMP_FILE_PATH = MEDIA_ROOT / 'temp_files'
 MAX_FILE_SIZE = int(os.environ.get('MAX_FILE_SIZE', '52428800'))  # 50 MB

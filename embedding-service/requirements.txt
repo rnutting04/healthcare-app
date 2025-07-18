@@ -28,3 +28,6 @@ colorlog==6.9.0
 
 # Production server
 gunicorn==23.0.0
+
+# Redis for queue management
+redis==5.0.1
