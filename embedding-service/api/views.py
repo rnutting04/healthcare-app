@@ -47,9 +47,16 @@ class ProcessEmbeddingView(APIView):
             os.makedirs(temp_dir, exist_ok=True)
             
             temp_file_path = os.path.join(temp_dir, f"{document_id}_{uploaded_file.name}")
+            logger.info(f"Saving file to: {temp_file_path}")
             with open(temp_file_path, 'wb') as f:
                 for chunk in uploaded_file.chunks():
                     f.write(chunk)
+            
+            # Verify file was saved
+            if os.path.exists(temp_file_path):
+                logger.info(f"File saved successfully: {temp_file_path}, size: {os.path.getsize(temp_file_path)}")
+            else:
+                logger.error(f"File not saved properly: {temp_file_path}")
             
             # Add task to queue
             user_id = getattr(request, 'user_id', 'unknown')
