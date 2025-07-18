@@ -155,7 +155,7 @@ services:
     env: docker
     plan: starter
     dockerfilePath: ./nginx/Dockerfile
-    dockerContext: ./nginx
+    dockerContext: .
     envVars:
       - key: AUTH_SERVICE_URL
         fromService:

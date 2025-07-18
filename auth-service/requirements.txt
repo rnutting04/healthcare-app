@@ -10,3 +10,4 @@ python-decouple==3.8
 drf-yasg==1.21.10
 django-ratelimit==4.1.0
 requests==2.32.4
+whitenoise==6.9.0
