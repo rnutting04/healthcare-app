@@ -189,8 +189,9 @@ class QueueManager:
             
             try:
                 # Get task from queue with timeout
+                logger.debug(f"Worker {worker_id} trying to get task from queue")
                 task = self.queue.get(timeout=1)
-                logger.info(f"Worker {worker_id} got task: {task.document_id}")
+                logger.info(f"Worker {worker_id} GOT TASK: {task.document_id} - STARTING PROCESSING")
                 
                 # Move to active tasks
                 self.active_tasks[task.document_id] = task
@@ -216,11 +217,20 @@ class QueueManager:
         task.started_at = datetime.utcnow()
         
         try:
+            # Check if file exists
+            if not os.path.exists(task.file_path):
+                logger.error(f"File not found: {task.file_path}")
+                raise FileNotFoundError(f"File not found: {task.file_path}")
+            
+            logger.info(f"Processing file: {task.file_path} (exists: {os.path.exists(task.file_path)}, size: {os.path.getsize(task.file_path)})")
+            
             # Process document
             task.progress = 10
+            logger.info(f"Starting document processing for {task.document_id}")
             file_hash, text_chunks, full_text = self.document_processor.process_document(
                 task.file_path, task.file_type
             )
+            logger.info(f"Document processed: {len(text_chunks)} chunks created")
             
             # Check for duplicate by hash
             if self.db_client.check_hash_exists(file_hash):
