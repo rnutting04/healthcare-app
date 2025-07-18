@@ -434,8 +434,22 @@ class QueueManager:
             )
             
             # Move to completed tasks
-            del self.active_tasks[task.document_id]
-            self.completed_tasks[task.document_id] = task
+            if self.use_redis:
+                # Move from processing to completed in Redis
+                task_dict = task.to_dict()
+                self.redis_client.hdel(settings.REDIS_PROCESSING_KEY, task.document_id)
+                self.redis_client.hset(
+                    settings.REDIS_COMPLETED_KEY,
+                    task.document_id,
+                    json.dumps(task_dict)
+                )
+                # Set expiry for completed task
+                self.redis_client.expire(settings.REDIS_COMPLETED_KEY, settings.REDIS_TASK_TTL)
+            else:
+                # Move to completed tasks in memory
+                if task.document_id in self.active_tasks:
+                    del self.active_tasks[task.document_id]
+                self.completed_tasks[task.document_id] = task
             
             logger.info(f"Successfully processed document {task.document_id}")
             
