@@ -7,10 +7,12 @@ from .services import DatabaseService
 from .serializers import (
     PatientSerializer, AppointmentSerializer, 
     MedicalRecordSerializer, PrescriptionSerializer,
-    PatientDashboardSerializer, LanguageSerializer
+    PatientDashboardSerializer, LanguageSerializer,
+    ChatSessionSerializer, ChatMessageSerializer
 )
 import logging
 
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
 
@@ -413,3 +415,142 @@ class LanguageViewSet(viewsets.ViewSet):
         if not language:
             return Response({'error': 'Language not found'}, status=status.HTTP_404_NOT_FOUND)
         return Response(language)
+
+import openai
+from openai import ChatCompletion
+from django.conf import settings
+import re
+
+class ChatViewSet(viewsets.ViewSet):
+    def get_patient(self, request):
+        return DatabaseService.get_patient_by_user_id(request.user_id)
+
+    def get_response(self, prompt):
+        return ChatCompletion.create(
+            model="gpt-3.5-turbo",
+            messages=prompt,
+            api_key=settings.OPENAI_API_KEY
+        )
+
+    @action(detail=False, methods=["post"])
+    def start(self, request):
+        patient = self.get_patient(request)
+        session = DatabaseService.create_chat_session(patient['id'])
+        return Response(ChatSessionSerializer(session).data)
+
+    @action(detail=False, methods=['get'])
+    def sessions(self, request):
+        patient = self.get_patient(request)
+        sessions = DatabaseService.get_chat_sessions_by_patient(patient['id'])
+        serializer = ChatSessionSerializer(sessions, many=True)
+        return Response(serializer.data)
+
+    @action(detail=False, methods=["post"])
+    def load(self, request):
+        session_id = request.data.get("session_id")
+        if not session_id:
+            return Response({"error": "Session ID is required."}, status=400)
+
+        patient = self.get_patient(request)
+        session, messages = DatabaseService.get_session_and_messages(session_id, patient['id'])
+        if not session:
+            return Response({"error": "Session not found."}, status=404)
+        return Response({
+            "session": ChatSessionSerializer(session).data,
+            "messages": ChatMessageSerializer(messages, many=True).data,
+            "suggestions": ChatSessionSerializer(session).data.get('suggestions')
+        })
+
+    @action(detail=False, methods=["post"])
+    def message(self, request):
+        user_message = request.data.get("message")
+        session_id = request.data.get("session_id")
+
+        if not user_message:
+            return Response({"error": "Message is required"}, status=400)
+
+        patient = self.get_patient(request)
+        preffered_language = patient['preferred_language']
+        if session_id:
+            session  = DatabaseService.get_chat_session_by_id_and_patient(session_id, patient['id'])
+            logger.info(f"Loaded session {session_id} for patient {patient['id']} {session}")
+            if not session:
+                return Response({"error": "Invalid session ID"}, status=400)
+        else:
+            session = DatabaseService.get_latest_chat_session(patient['id'])
+            if not session:
+                session = DatabaseService.create_chat_session(patient['id'])
+
+        messages = DatabaseService.get_messages_for_session(session['id'])
+        history = [{"role": "system", "content": "You are a helpful assistant for a patient dashboard following NCCN guidelines. Speak to the patient in " + preffered_language + "."}]
+        for msg in messages:
+            history.append({"role": msg.role, "content": msg.content})
+
+        history.append({"role": "user", "content": user_message})
+
+        rough_token_count = sum(len(m["content"]) for m in history) // 4
+        if rough_token_count > settings.MAX_TOKENS_THRESHOLD:
+            session = DatabaseService.create_chat_session(patient['id'])
+            history = [
+                {"role": "system", "content": "You are a helpful assistant for a patient dashboardi following NCCN guidelines. Speak to the patient in " + preffered_language + "."},
+                {"role": "user", "content": user_message}
+            ]
+
+        DatabaseService.create_chat_message(session['id'], "user", user_message)
+
+        try:
+            response = self.get_response(history)
+            reply = response.choices[0].message.content.strip()
+        except Exception as e:
+            return Response({"error": str(e)}, status=500)
+
+        DatabaseService.create_chat_message(session['id'], "assistant", reply)
+        if not session['title'] or session['title'].strip() == "New Chat":
+            try:
+                title_prompt = [
+                    {"role": "system", "content": "Generate a short title (3-4 words) summarizing the conversation. Speak to the patient in " + preffered_language + "."},
+                    {"role": "user", "content": user_message},
+                    {"role": "assistant", "content": reply}
+                ]
+                title_response = self.get_response(title_prompt)
+                generated_title = title_response.choices[0].message.content.strip()
+                DatabaseService.update_session_title(session['id'], generated_title[:25])
+            except Exception as e:
+                print("Title generation failed:", e)
+
+        try:
+            followup_prompt = history[:-4] + [
+                {"role": "system", "content": (
+                "You are generating 4 suggested follow-up questions that a patient might ask next."
+                "Answer format question, question, question, question."
+                "Speak to the patient in " + preffered_language + "."
+               )},
+                {"role": "assistant", "content": reply},
+            ]
+            logger.info(f"followup_prompt: {followup_prompt}")
+            suggestion_response = self.get_response(followup_prompt)
+            suggestions_text = suggestion_response.choices[0].message.content.strip()
+            suggestions = [
+                re.sub(r"^\s*(\d+[\.\)]|\-|\•)\s*", "", line).strip()
+                for line in suggestions_text.split("\n")
+                if line.strip()
+            ]
+            suggestions = suggestions[:4]  # limit to 4
+            DatabaseService.update_session_suggestions(session['id'], suggestions)
+        except Exception as e:
+            print("Suggestion generation failed:", e)
+            suggestions = []
+            
+        return Response({
+            "response": reply,
+            "session_id": session['id'],
+            "suggestions": suggestions
+        })
+
+    @action(detail=True, methods=["delete"])
+    def delete(self, request, pk=None):
+        patient = self.get_patient(request)
+        success = DatabaseService.delete_chat_session(pk, patient['id'])
+        if success:
+            return Response({"message": "Session deleted."})
+        return Response({"error": "Delete failed or session not found."}, status=400)

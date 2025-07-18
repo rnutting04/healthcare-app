@@ -7,7 +7,8 @@ BASE_DIR = Path(__file__).resolve().parent
 
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = config('SECRET_KEY', default='django-insecure-dev-key')
-
+OPENAI_API_KEY = config('OPENAI_API_KEY', default='')
+MAX_TOKENS_THRESHOLD = config('MAX_TOKENS_THRESHOLD', default=2000, cast=int)
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = config('DEBUG', default=True, cast=bool)
 

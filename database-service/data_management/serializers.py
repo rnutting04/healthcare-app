@@ -1,6 +1,6 @@
 from rest_framework import serializers
-from .models import User, Role, Patient, Appointment, MedicalRecord, Prescription, EventLog, CancerType, FileMetadata, RAGDocument, Language, DocumentEmbedding, EmbeddingChunk
 
+from .models import User, Role, Patient, Appointment, MedicalRecord, Prescription, EventLog, CancerType, FileMetadata, RAGDocument, Language, DocumentEmbedding, EmbeddingChunk, ChatSession, ChatMessage
 class LanguageSerializer(serializers.ModelSerializer):
     class Meta:
         model = Language
@@ -167,3 +167,15 @@ class DocumentEmbeddingSerializer(serializers.ModelSerializer):
         fields = ['file', 'total_chunks', 'embedding_model', 'processing_status', 
                   'error_message', 'processed_at', 'chunks', 'file_data']
         read_only_fields = ['processed_at']
+        
+class ChatMessageSerializer(serializers.ModelSerializer):
+    class Meta:
+        model  = ChatMessage
+        fields = ["id", "session_id", "role", "content", "timestamp"]
+
+class ChatSessionSerializer(serializers.ModelSerializer):
+    messages = ChatMessageSerializer(many=True, read_only=True)
+
+    class Meta:
+        model  = ChatSession
+        fields = ["id","patient_id", "title", "created_at", "messages", "suggestions"]

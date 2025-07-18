@@ -89,3 +89,20 @@ class PatientDashboardSerializer(serializers.Serializer):
     upcoming_appointments = AppointmentSerializer(many=True, read_only=True)
     recent_records = MedicalRecordSerializer(many=True, read_only=True)
     active_prescriptions = PrescriptionSerializer(many=True, read_only=True)
+
+
+class ChatMessageSerializer(serializers.Serializer):
+    id = serializers.IntegerField(read_only=True)
+    session_id = serializers.UUIDField(read_only=True)
+    role = serializers.ChoiceField(choices=[("user", "User"), ("assistant", "Assistant")])
+    content = serializers.CharField()
+    timestamp = serializers.DateTimeField()
+
+
+class ChatSessionSerializer(serializers.Serializer):
+    id = serializers.UUIDField(read_only=True)
+    patient_id = serializers.IntegerField()
+    title = serializers.CharField()
+    messages = ChatMessageSerializer(many=True, required=False)
+    created_at = serializers.DateTimeField()
+    suggestions = serializers.ListField(child=serializers.CharField(), required=False)

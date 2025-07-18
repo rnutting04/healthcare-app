@@ -8,6 +8,7 @@ router.register(r'appointments', views.AppointmentViewSet, basename='appointment
 router.register(r'medical-records', views.MedicalRecordViewSet, basename='medicalrecord')
 router.register(r'prescriptions', views.PrescriptionViewSet, basename='prescription')
 router.register(r'languages', views.LanguageViewSet, basename='language')
+router.register(r'chat', views.ChatViewSet, basename='chat')
 
 urlpatterns = [
     path('', include(router.urls)),

@@ -19,6 +19,7 @@ router.register(r'rag-documents', views.RAGDocumentViewSet)
 router.register(r'refresh-tokens', views.RefreshTokenViewSet)
 router.register(r'document-embeddings', views.DocumentEmbeddingViewSet)
 router.register(r'embedding-chunks', views.EmbeddingChunkViewSet)
+router.register(r'chat', views.ChatViewSet, basename='chat')
 
 urlpatterns = [
     path('', include(router.urls)),
