@@ -117,7 +117,8 @@ REST_FRAMEWORK = {
 # File service settings
 DATABASE_SERVICE_URL = os.getenv('DATABASE_SERVICE_URL', 'http://database-service:8004')
 JWT_SECRET_KEY = os.getenv('JWT_SECRET_KEY', 'your-secret-key-here')
-FILE_STORAGE_PATH = os.getenv('FILE_STORAGE_PATH', os.path.join(MEDIA_ROOT, 'encrypted_files'))
+# Always use relative path for file storage to ensure write permissions
+FILE_STORAGE_PATH = os.path.join(MEDIA_ROOT, 'encrypted_files') if os.getenv('FILE_STORAGE_PATH', '').startswith('/') else os.getenv('FILE_STORAGE_PATH', os.path.join(MEDIA_ROOT, 'encrypted_files'))
 MAX_FILE_SIZE_MB = int(os.getenv('MAX_FILE_SIZE_MB', '100'))
 
 # Logging
