@@ -119,7 +119,25 @@ CORS_ALLOWED_ORIGINS = [
     "http://localhost:8005",
 ]
 
+# Add additional CORS origins from environment if provided
+additional_cors = config('CORS_ALLOWED_ORIGINS', default='').split(',')
+if additional_cors and additional_cors != ['']:
+    CORS_ALLOWED_ORIGINS.extend(additional_cors)
+
 CORS_ALLOW_CREDENTIALS = True
+
+# CSRF settings for proxy deployment
+CSRF_TRUSTED_ORIGINS = config('CSRF_TRUSTED_ORIGINS', default='').split(',')
+if CSRF_TRUSTED_ORIGINS == ['']:
+    CSRF_TRUSTED_ORIGINS = []
+
+# Trust X-Forwarded headers from proxy (only if explicitly enabled)
+USE_X_FORWARDED_HOST = config('USE_X_FORWARDED_HOST', default=False, cast=bool)
+USE_X_FORWARDED_PORT = config('USE_X_FORWARDED_PORT', default=False, cast=bool)
+
+# Only set this if we're behind a proxy
+if config('BEHIND_PROXY', default=False, cast=bool):
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
 # Service URLs
 DATABASE_SERVICE_URL = config('DATABASE_SERVICE_URL', default='http://database-service:8004')
