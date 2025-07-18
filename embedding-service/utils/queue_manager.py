@@ -83,9 +83,11 @@ class QueueManager:
     def start(self):
         """Start the queue workers."""
         if self.running:
+            logger.warning("Queue manager already running, skipping start")
             return
         
         self.running = True
+        logger.info(f"Setting self.running = {self.running}")
         
         # Start worker threads
         for i in range(settings.MAX_CONCURRENT_EMBEDDINGS):
@@ -93,8 +95,9 @@ class QueueManager:
             worker.daemon = True
             worker.start()
             self.workers.append(worker)
+            logger.info(f"Started worker thread {i}")
         
-        logger.info(f"Started {settings.MAX_CONCURRENT_EMBEDDINGS} embedding workers")
+        logger.info(f"Started {settings.MAX_CONCURRENT_EMBEDDINGS} embedding workers, self.running = {self.running}")
     
     def stop(self):
         """Stop the queue workers."""
@@ -121,7 +124,7 @@ class QueueManager:
             return task
         
         self.queue.put(task)
-        logger.info(f"Added task to queue: document_id={document_id}, queue_size={self.queue.qsize()}")
+        logger.info(f"Added task to queue: document_id={document_id}, queue_size={self.queue.qsize()}, running={self.running}, workers={len(self.workers)}")
         
         return task
     
@@ -176,12 +179,18 @@ class QueueManager:
     
     def _worker(self, worker_id: int):
         """Worker thread that processes embedding tasks."""
-        logger.info(f"Worker {worker_id} started")
+        logger.info(f"Worker {worker_id} started, self.running = {self.running}")
         
+        loop_count = 0
         while self.running:
+            loop_count += 1
+            if loop_count % 10 == 0:  # Log every 10 loops
+                logger.debug(f"Worker {worker_id} alive, loop {loop_count}, queue size: {self.queue.qsize()}, running: {self.running}")
+            
             try:
                 # Get task from queue with timeout
                 task = self.queue.get(timeout=1)
+                logger.info(f"Worker {worker_id} got task: {task.document_id}")
                 
                 # Move to active tasks
                 self.active_tasks[task.document_id] = task
@@ -195,9 +204,9 @@ class QueueManager:
             except queue.Empty:
                 continue
             except Exception as e:
-                logger.error(f"Worker {worker_id} error: {str(e)}")
+                logger.error(f"Worker {worker_id} error: {str(e)}", exc_info=True)
         
-        logger.info(f"Worker {worker_id} stopped")
+        logger.info(f"Worker {worker_id} stopped, final loop count: {loop_count}, self.running = {self.running}")
     
     def _process_task(self, task: EmbeddingTask, worker_id: int):
         """Process a single embedding task."""
