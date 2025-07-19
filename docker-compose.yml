@@ -58,6 +58,8 @@ services:
       - DATABASE_SERVICE_URL=http://database-service:8004
       - AUTH_SERVICE_URL=http://auth-service:8001
       - SECRET_KEY=${SECRET_KEY:-your-secret-key-here}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - OPENAI_MAX_TOKENS_PER_CHUNK=${OPENAI_MAX_TOKENS_PER_CHUNK:-8000}
       - DEBUG=${DEBUG:-True}
       - ALLOWED_HOSTS=${ALLOWED_HOSTS:-*}
       - JWT_SECRET_KEY=${JWT_SECRET_KEY:-your-secret-key-here}

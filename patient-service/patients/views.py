@@ -489,7 +489,7 @@ class ChatViewSet(viewsets.ViewSet):
         history.append({"role": "user", "content": user_message})
 
         rough_token_count = sum(len(m["content"]) for m in history) // 4
-        if rough_token_count > settings.MAX_TOKENS_THRESHOLD:
+        if rough_token_count > settings.OPENAI_MAX_TOKENS_PER_CHUNK:
             session = DatabaseService.create_chat_session(patient['id'])
             history = [
                 {"role": "system", "content": "You are a helpful assistant for a patient dashboardi following NCCN guidelines. Speak to the patient in " + preffered_language + "."},
