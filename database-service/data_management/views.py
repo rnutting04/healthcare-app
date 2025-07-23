@@ -967,7 +967,7 @@ class EmbeddingChunkViewSet(viewsets.ModelViewSet):
                 chunk = EmbeddingChunk.objects.create(
                     document_embedding=doc_embedding,
                     chunk_index=chunk_data['chunk_index'],
-                    chunk_text_preview=chunk_data.get('chunk_text_preview', '')[:500],
+                    chunk_text=chunk_data.get('chunk_text', ''),
                     embedding_vector=chunk_data['embedding_vector'],
                     vector_dimension=chunk_data['vector_dimension']
                 )

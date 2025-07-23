@@ -63,7 +63,7 @@ class DatabaseClient:
             if embedding is not None:
                 embedding_data.append({
                     'chunk_index': i,
-                    'chunk_text': chunk[:500],  # Store first 500 chars for reference
+                    'chunk_text': chunk,  # Store full chunk text for RAG
                     'embedding_vector': json.dumps(embedding),  # Store as JSON string
                     'vector_dimension': len(embedding)
                 })

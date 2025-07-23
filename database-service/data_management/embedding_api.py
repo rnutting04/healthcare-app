@@ -77,7 +77,7 @@ def store_embeddings(request):
             EmbeddingChunk.objects.create(
                 document_embedding=doc_embedding,
                 chunk_index=embedding_data['chunk_index'],
-                chunk_text_preview=embedding_data['chunk_text'][:500],
+                chunk_text=embedding_data['chunk_text'],
                 embedding_vector=embedding_data['embedding_vector'],
                 vector_dimension=embedding_data['vector_dimension']
             )

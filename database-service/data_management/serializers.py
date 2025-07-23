@@ -154,7 +154,7 @@ class RAGDocumentSerializer(serializers.ModelSerializer):
 class EmbeddingChunkSerializer(serializers.ModelSerializer):
     class Meta:
         model = EmbeddingChunk
-        fields = ['id', 'chunk_index', 'chunk_text_preview', 'embedding_vector', 'vector_dimension']
+        fields = ['id', 'chunk_index', 'chunk_text', 'embedding_vector', 'vector_dimension']
         read_only_fields = ['id']
 
 

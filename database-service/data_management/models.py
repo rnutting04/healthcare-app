@@ -351,7 +351,7 @@ class EmbeddingChunk(models.Model):
         related_name='chunks'
     )
     chunk_index = models.IntegerField()
-    chunk_text_preview = models.CharField(max_length=500)  # First 500 chars of chunk
+    chunk_text = models.TextField()  # Full chunk text for RAG retrieval
     embedding_vector = models.TextField()  # JSON serialized embedding vector
     vector_dimension = models.IntegerField()
     
