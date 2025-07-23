@@ -12,6 +12,7 @@ openai==1.97.0
 # Document processing
 PyPDF2==3.0.1
 python-docx==1.2.0
+pycryptodome==3.23.0
 
 # HTTP requests
 requests==2.32.4
