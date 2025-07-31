@@ -1,0 +1,15 @@
+fastapi
+pydantic
+gunicorn
+uvicorn
+redis
+python-multipart
+transformers
+sentencepiece
+sacremoses
+pytest
+httpx
+requests
+openai
+sentence-transformers
+scikit-learn
