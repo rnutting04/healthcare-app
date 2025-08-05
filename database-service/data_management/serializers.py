@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import User, Role, Patient, Appointment, MedicalRecord, Prescription, EventLog, CancerType, FileMetadata, RAGDocument, Language, DocumentEmbedding, EmbeddingChunk
+from .models import User, Role, Patient, EventLog, CancerType, FileMetadata, RAGDocument, Language, RAGEmbedding, RAGEmbeddingJob
 
 class LanguageSerializer(serializers.ModelSerializer):
     class Meta:
@@ -48,54 +48,6 @@ class PatientSerializer(serializers.ModelSerializer):
 #         fields = '__all__'
 #         read_only_fields = ['created_at', 'updated_at']
 
-class AppointmentSerializer(serializers.ModelSerializer):
-    patient_name = serializers.SerializerMethodField()
-    clinician_name = serializers.SerializerMethodField()
-    
-    class Meta:
-        model = Appointment
-        fields = '__all__'
-        read_only_fields = ['created_at', 'updated_at']
-    
-    def get_patient_name(self, obj):
-        # Since Patient only has user_id, we can't get the name directly
-        return f"Patient ID: {obj.patient.user_id}"
-    
-    def get_clinician_name(self, obj):
-        return obj.clinician_name
-
-class MedicalRecordSerializer(serializers.ModelSerializer):
-    patient_name = serializers.SerializerMethodField()
-    clinician_name = serializers.SerializerMethodField()
-    
-    class Meta:
-        model = MedicalRecord
-        fields = '__all__'
-        read_only_fields = ['created_at', 'updated_at']
-    
-    def get_patient_name(self, obj):
-        # Since Patient only has user_id, we can't get the name directly
-        return f"Patient ID: {obj.patient.user_id}"
-    
-    def get_clinician_name(self, obj):
-        return obj.clinician_name
-
-class PrescriptionSerializer(serializers.ModelSerializer):
-    patient_name = serializers.SerializerMethodField()
-    clinician_name = serializers.SerializerMethodField()
-    
-    class Meta:
-        model = Prescription
-        fields = '__all__'
-        read_only_fields = ['created_at']
-    
-    def get_patient_name(self, obj):
-        # Since Patient only has user_id, we can't get the name directly
-        return f"Patient ID: {obj.patient.user_id}"
-    
-    def get_clinician_name(self, obj):
-        return obj.clinician_name
-
 class CancerTypeSerializer(serializers.ModelSerializer):
     subtypes = serializers.SerializerMethodField()
     parent_details = serializers.SerializerMethodField()
@@ -124,17 +76,6 @@ class EventLogSerializer(serializers.ModelSerializer):
         fields = '__all__'
         read_only_fields = ['created_at']
 
-class MedicalRecordCreateSerializer(serializers.Serializer):
-    patient_id = serializers.IntegerField()
-    clinician_id = serializers.IntegerField()
-    clinician_name = serializers.CharField()
-    record_type = serializers.CharField()
-    title = serializers.CharField()
-    description = serializers.CharField()
-    diagnosis = serializers.CharField(required=False, allow_blank=True)
-    treatment = serializers.CharField(required=False, allow_blank=True)
-
-
 class FileMetadataSerializer(serializers.ModelSerializer):
     class Meta:
         model = FileMetadata
@@ -151,19 +92,53 @@ class RAGDocumentSerializer(serializers.ModelSerializer):
         fields = ['file', 'cancer_type', 'cancer_type_name', 'file_data']
 
 
-class EmbeddingChunkSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = EmbeddingChunk
-        fields = ['id', 'chunk_index', 'chunk_text', 'embedding_vector', 'vector_dimension']
-        read_only_fields = ['id']
-
-
-class DocumentEmbeddingSerializer(serializers.ModelSerializer):
-    chunks = EmbeddingChunkSerializer(many=True, read_only=True)
-    file_data = FileMetadataSerializer(source='file', read_only=True)
+# RAG Embedding serializers
+class RAGEmbeddingSerializer(serializers.ModelSerializer):
+    document_name = serializers.CharField(source='document.file.filename', read_only=True)
     
     class Meta:
-        model = DocumentEmbedding
-        fields = ['file', 'total_chunks', 'embedding_model', 'processing_status', 
-                  'error_message', 'processed_at', 'chunks', 'file_data']
-        read_only_fields = ['processed_at']
+        model = RAGEmbedding
+        fields = ['id', 'document', 'document_name', 'chunk_index', 'chunk_text', 
+                 'embedding', 'metadata', 'created_at']
+        read_only_fields = ['id', 'created_at']
+
+
+class RAGEmbeddingJobSerializer(serializers.ModelSerializer):
+    document_name = serializers.CharField(source='document.file.filename', read_only=True)
+    
+    class Meta:
+        model = RAGEmbeddingJob
+        fields = ['id', 'document', 'document_name', 'status', 'message', 
+                 'created_at', 'updated_at', 'completed_at', 'retry_count']
+        read_only_fields = ['id', 'created_at', 'updated_at']
+
+
+class EmbeddingCreateSerializer(serializers.Serializer):
+    document_id = serializers.UUIDField()
+    cancer_type_id = serializers.IntegerField()
+    chunk_index = serializers.IntegerField()
+    chunk_text = serializers.CharField()
+    embedding = serializers.ListField(
+        child=serializers.FloatField(),
+        min_length=1536,
+        max_length=1536
+    )
+    metadata = serializers.JSONField(required=False, default=dict)
+
+
+class BulkEmbeddingCreateSerializer(serializers.Serializer):
+    document_id = serializers.UUIDField()
+    chunks = serializers.ListField(
+        child=EmbeddingCreateSerializer(),
+        allow_empty=False
+    )
+
+
+class EmbeddingSearchSerializer(serializers.Serializer):
+    query_embedding = serializers.ListField(
+        child=serializers.FloatField(),
+        min_length=1536,
+        max_length=1536
+    )
+    cancer_type_id = serializers.IntegerField(required=False, allow_null=True)
+    k = serializers.IntegerField(default=5, min_value=1, max_value=50)

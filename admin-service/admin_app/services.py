@@ -134,7 +134,7 @@ class DatabaseService:
             'clinician-service': settings.CLINICIAN_SERVICE_URL,
             'database-service': settings.DATABASE_SERVICE_URL,
             'file-service': settings.FILE_SERVICE_URL,
-            'embedding-service': settings.EMBEDDING_SERVICE_URL,
+            # 'embedding-service' removed - embedding functionality is no longer available
             'admin-service': 'http://admin-service:8005'  # Self check
         }
         
@@ -192,7 +192,12 @@ class DatabaseService:
     @staticmethod
     def create_rag_document(data):
         """Create RAG document association"""
-        return DatabaseService.make_request('POST', '/api/rag-documents/', data=data)
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info(f"Creating RAG document with data: {data}")
+        response = DatabaseService.make_request('POST', '/api/rag-documents/', data=data)
+        logger.info(f"RAG document creation response: {response}")
+        return response
     
     @staticmethod
     def get_rag_documents(cancer_type_id=None):

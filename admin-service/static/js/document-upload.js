@@ -275,27 +275,16 @@ document.addEventListener('DOMContentLoaded', function() {
             });
             
             const data = await response.json();
-            console.log('Upload response:', data);
             
             if (data.success) {
                 // Build success message with embedding status
                 let successMessage = data.message;
                 
-                // Check if we have embedding status info
+                // Check for embedding status in uploaded files
                 if (data.uploaded_files && data.uploaded_files.length > 0) {
-                    const embeddingStatuses = data.uploaded_files.map(file => {
-                        if (file.embedding_status === 'queued') {
-                            return `${file.filename}: Queued for embedding (position #${file.queue_position || 'N/A'})`;
-                        } else if (file.embedding_status === 'failed') {
-                            return `${file.filename}: Upload successful but embedding failed`;
-                        } else if (file.embedding_status === 'error') {
-                            return `${file.filename}: Upload successful but embedding error occurred`;
-                        }
-                        return null;
-                    }).filter(status => status !== null);
-                    
-                    if (embeddingStatuses.length > 0) {
-                        successMessage += '<br><br><strong>Embedding Status:</strong><br>' + embeddingStatuses.join('<br>');
+                    const embeddingFiles = data.uploaded_files.filter(f => f.embedding_status === 'queued');
+                    if (embeddingFiles.length > 0) {
+                        successMessage += `. ${embeddingFiles.length} file(s) queued for embedding processing.`;
                     }
                 }
                 
@@ -305,6 +294,18 @@ document.addEventListener('DOMContentLoaded', function() {
                     showSuccess(successMessage);
                     // Update the documents list after hiding modal
                     updateRecentUploads();
+                    // Start monitoring embedding status
+                    if (data.uploaded_files) {
+                        data.uploaded_files.forEach(file => {
+                            if (file.embedding_job_id) {
+                                // If we have a job ID, connect WebSocket directly
+                                connectEmbeddingWebSocket(file.embedding_job_id, file.file_id);
+                            } else if (file.embedding_status === 'queued' || file.embedding_status === 'processing') {
+                                // Otherwise fall back to polling
+                                monitorEmbeddingStatus(file.file_id);
+                            }
+                        });
+                    }
                 }, 1000);
                 
                 // Clear form
@@ -315,12 +316,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 
                 // Show any errors
                 if (data.errors && data.errors.length > 0) {
-                    console.log('Upload errors:', data.errors);
                     data.errors.forEach(error => showError(error));
                 }
             } else {
                 uploadProgressModal.classList.add('hidden');
-                console.log('Upload failed with response:', data);
                 showError(data.error || 'Upload failed');
             }
         } catch (error) {
@@ -464,6 +463,25 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
     
+    // Helper function to create document name with tooltip
+    function createDocumentNameWithTooltip(filename) {
+        const maxLength = 20;
+        
+        if (filename.length > maxLength) {
+            // Truncate and add ellipsis
+            const truncatedName = filename.substring(0, maxLength) + '...';
+            
+            return `
+                <div class="tooltip-container">
+                    <span class="document-name">${truncatedName}</span>
+                    <div class="tooltip">${filename}</div>
+                </div>
+            `;
+        } else {
+            return `<span class="document-name">${filename}</span>`;
+        }
+    }
+    
     // Render documents in table
     function renderDocuments(documents) {
         // Render desktop view
@@ -481,9 +499,12 @@ document.addEventListener('DOMContentLoaded', function() {
             const fileSize = formatFileSize(doc.file_data.file_size);
             const fileType = getFileTypeFromMimeType(doc.file_data.mime_type);
             
+            // Create document name cell with tooltip if truncated
+            const documentNameHtml = createDocumentNameWithTooltip(doc.file_data.filename);
+            
             row.innerHTML = `
-                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                    ${doc.file_data.filename}
+                <td class="px-6 py-4 text-sm font-medium text-gray-900 document-name-cell">
+                    ${documentNameHtml}
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                     ${doc.cancer_type}
@@ -494,16 +515,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                     ${uploadDate}
                 </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 type-column">
                     ${fileType}
                 </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm">
-                    <div class="embedding-status" data-document-id="${doc.file}">
-                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                            <svg class="animate-spin -ml-0.5 mr-1.5 h-3 w-3 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                            </svg>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <div id="embedding-status-desktop-${doc.file}" class="embedding-status" data-document-id="${doc.file}">
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800 animate-pulse">
                             Checking...
                         </span>
                     </div>
@@ -521,6 +538,25 @@ document.addEventListener('DOMContentLoaded', function() {
             `;
             
             tableBody.appendChild(row);
+            
+            // Immediately check embedding status for this document
+            (async () => {
+                try {
+                    const response = await fetch(`/admin/api/embedding-status/${doc.file}/`, {
+                        headers: {
+                            'X-Requested-With': 'XMLHttpRequest'
+                        },
+                        credentials: 'same-origin'
+                    });
+                    
+                    if (response.ok) {
+                        const statusData = await response.json();
+                        updateEmbeddingStatusDisplay(doc.file, statusData);
+                    }
+                } catch (error) {
+                    console.error(`Error checking embedding status for ${doc.file}:`, error);
+                }
+            })();
             
             // Create mobile card
             const mobileCard = document.createElement('div');
@@ -543,17 +579,13 @@ document.addEventListener('DOMContentLoaded', function() {
                         <span>Uploaded:</span>
                         <span>${new Date(doc.file_data.uploaded_at).toLocaleDateString()}</span>
                     </div>
-                    <div class="flex justify-between items-center">
+                    <div class="flex justify-between items-center mt-1">
                         <span>Embedding:</span>
-                        <div class="embedding-status" data-document-id="${doc.file}">
-                            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                                <svg class="animate-spin -ml-0.5 mr-1.5 h-3 w-3 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                </svg>
+                        <span id="embedding-status-mobile-${doc.file}" class="embedding-status" data-document-id="${doc.file}">
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800 animate-pulse">
                                 Checking...
                             </span>
-                        </div>
+                        </span>
                     </div>
                 </div>
                 <div class="mt-3 flex gap-2">
@@ -567,10 +599,10 @@ document.addEventListener('DOMContentLoaded', function() {
             `;
             
             mobileView.appendChild(mobileCard);
+            
+            // Also check embedding status for mobile view (same document ID is used in both views)
+            // The status update will apply to both desktop and mobile elements with the same ID
         });
-        
-        // Check embedding status for all documents
-        checkAllEmbeddingStatuses();
     }
     
     // Update pagination controls
@@ -840,112 +872,251 @@ document.addEventListener('DOMContentLoaded', function() {
     // Make updateRecentUploads available globally if needed
     window.updateRecentUploads = updateRecentUploads;
     
+    // WebSocket connections for embedding status
+    const embeddingWebSockets = new Map();
+    
+    // Function to monitor embedding status
+    function monitorEmbeddingStatus(documentId) {
+        // First check if there's a job ID from the recent upload
+        const checkInitialStatus = async () => {
+            try {
+                const response = await fetch(`/admin/api/embedding-status/${documentId}/`, {
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest'
+                    },
+                    credentials: 'same-origin'
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    updateEmbeddingStatusDisplay(documentId, data);
+                    
+                    // If processing, try to get job ID and connect WebSocket
+                    if (data.status === 'processing' || data.status === 'pending') {
+                        // Check for job_id in response
+                        const jobId = data.job_id;
+                        
+                        if (jobId) {
+                            connectEmbeddingWebSocket(jobId, documentId);
+                        } else {
+                            // Fall back to polling
+                            setTimeout(() => checkInitialStatus(), 5000);
+                        }
+                    }
+                }
+            } catch (error) {
+                console.error(`Error checking embedding status for ${documentId}:`, error);
+            }
+        };
+        
+        checkInitialStatus();
+    }
+    
+    // Function to connect WebSocket for real-time updates
+    function connectEmbeddingWebSocket(jobId, documentId) {
+        // Close existing connection if any
+        if (embeddingWebSockets.has(jobId)) {
+            embeddingWebSockets.get(jobId).close();
+        }
+        
+        const wsScheme = window.location.protocol === 'https:' ? 'wss' : 'ws';
+        const wsUrl = `${wsScheme}://${window.location.host}/ws/embedding/progress/${jobId}/`;
+        
+        const socket = new WebSocket(wsUrl);
+        
+        socket.onopen = () => {
+            embeddingWebSockets.set(jobId, socket);
+        };
+        
+        socket.onmessage = (event) => {
+            const data = JSON.parse(event.data);
+            
+            if (data.type === 'progress_update') {
+                updateEmbeddingStatusDisplay(documentId, {
+                    status: data.status,
+                    message: data.message,
+                    progress: data.progress
+                });
+            } else if (data.type === 'job_complete') {
+                // When job completes, fetch the actual embedding status to get chunk count
+                socket.close();
+                embeddingWebSockets.delete(jobId);
+                
+                // Small delay to ensure embeddings are saved in database
+                setTimeout(() => {
+                    // Fetch the actual status with chunk count
+                    fetch(`/admin/api/embedding-status/${documentId}/`, {
+                        headers: {
+                            'X-Requested-With': 'XMLHttpRequest'
+                        },
+                        credentials: 'same-origin'
+                    })
+                    .then(response => response.json())
+                    .then(statusData => {
+                        updateEmbeddingStatusDisplay(documentId, statusData);
+                    })
+                    .catch(error => {
+                        console.error(`Error fetching final status for ${documentId}:`, error);
+                        // Fallback to the WebSocket data
+                        updateEmbeddingStatusDisplay(documentId, {
+                            status: 'completed',
+                            message: data.message,
+                            chunks_count: data.chunks_count || 0
+                        });
+                    });
+                }, 1000); // 1 second delay
+            } else if (data.type === 'job_error') {
+                updateEmbeddingStatusDisplay(documentId, {
+                    status: 'error',
+                    message: data.message
+                });
+                socket.close();
+                embeddingWebSockets.delete(jobId);
+            }
+        };
+        
+        socket.onerror = (error) => {
+            console.error(`WebSocket error for job ${jobId}:`, error);
+        };
+        
+        socket.onclose = () => {
+            embeddingWebSockets.delete(jobId);
+        };
+    }
+    
+    // Function to update embedding status display
+    function updateEmbeddingStatusDisplay(documentId, statusData) {
+        // Update both desktop and mobile views
+        const desktopElement = document.getElementById(`embedding-status-desktop-${documentId}`);
+        const mobileElement = document.getElementById(`embedding-status-mobile-${documentId}`);
+        
+        
+        if (!desktopElement && !mobileElement) {
+            console.error(`Could not find any elements for document: ${documentId}`);
+            return;
+        }
+        
+        
+        let statusHtml = '';
+        const progress = statusData.progress || {};
+        
+        switch (statusData.status) {
+            case 'completed':
+                const chunksCount = statusData.chunks_count || statusData.message?.match(/\d+/)?.[0] || '0';
+                statusHtml = `
+                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                        Ready (${chunksCount})
+                    </span>
+                `;
+                break;
+            case 'processing':
+                const percentage = progress.percentage || 0;
+                const phase = progress.phase || 'processing';
+                
+                // Show processing with progress if available
+                if (phase === 'embedding' && progress.total_chunks) {
+                    statusHtml = `
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 animate-pulse">
+                            Processing ${percentage}%
+                        </span>
+                    `;
+                } else {
+                    // Simple processing indicator
+                    statusHtml = `
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 animate-pulse">
+                            Processing
+                        </span>
+                    `;
+                }
+                break;
+            case 'pending':
+                statusHtml = `
+                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                        Queued
+                    </span>
+                `;
+                break;
+            case 'error':
+                statusHtml = `
+                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                        Failed
+                    </span>
+                `;
+                break;
+            case 'not_started':
+            case 'no_embeddings':
+                statusHtml = `
+                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                        Not processed
+                    </span>
+                `;
+                break;
+            default:
+                // Keep "Checking..." for truly unknown states
+                statusHtml = `
+                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800 animate-pulse">
+                        Checking...
+                    </span>
+                `;
+        }
+        
+        
+        // Update both desktop and mobile elements if they exist
+        if (desktopElement) {
+            desktopElement.innerHTML = statusHtml;
+        }
+        if (mobileElement) {
+            mobileElement.innerHTML = statusHtml;
+        }
+    }
+    
     // Check embedding status for all visible documents
-    async function checkAllEmbeddingStatuses() {
+    function checkAllEmbeddingStatuses() {
         const statusElements = document.querySelectorAll('.embedding-status');
         
-        statusElements.forEach(async (element) => {
+        // Use a Set to avoid checking the same document twice
+        const checkedDocuments = new Set();
+        
+        statusElements.forEach(async element => {
             const documentId = element.getAttribute('data-document-id');
-            if (documentId) {
-                await checkEmbeddingStatus(documentId, element);
+            
+            if (documentId && !checkedDocuments.has(documentId)) {
+                checkedDocuments.add(documentId);
+                // First check status to see if we need to monitor
+                try {
+                    const response = await fetch(`/admin/api/embedding-status/${documentId}/`, {
+                        headers: {
+                            'X-Requested-With': 'XMLHttpRequest'
+                        },
+                        credentials: 'same-origin'
+                    });
+                    
+                    if (response.ok) {
+                        const data = await response.json();
+                        updateEmbeddingStatusDisplay(documentId, data);
+                        
+                        // Only monitor if still processing
+                        if (data.status === 'processing' || data.status === 'pending') {
+                            monitorEmbeddingStatus(documentId);
+                        }
+                    } else {
+                        console.error(`Failed to get embedding status for ${documentId}: ${response.status}`);
+                    }
+                } catch (error) {
+                    console.error(`Error checking initial status for ${documentId}:`, error);
+                }
             }
         });
     }
     
-    // Check embedding status for a single document
-    async function checkEmbeddingStatus(documentId, statusElement) {
-        try {
-            // Add a subtle pulse effect to indicate checking
-            if (statusElement.querySelector('span')) {
-                statusElement.querySelector('span').style.opacity = '0.7';
-            }
-            
-            const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
-            
-            const response = await fetch(`/admin/api/embedding-status/${documentId}/`, {
-                method: 'GET',
-                headers: {
-                    'X-CSRFToken': csrfToken,
-                    'X-Requested-With': 'XMLHttpRequest'
-                },
-                credentials: 'same-origin'
-            });
-            
-            if (!response.ok) {
-                updateStatusDisplay(statusElement, 'error', 'Failed to check');
-                return;
-            }
-            
-            const data = await response.json();
-            
-            // Update the status display based on the response
-            if (data.status === 'completed') {
-                updateStatusDisplay(statusElement, 'completed', 'Embedded');
-            } else if (data.status === 'processing') {
-                const progressText = data.progress ? `Processing... (${Math.round(data.progress)}%)` : 'Processing...';
-                updateStatusDisplay(statusElement, 'processing', progressText);
-                // Check again in 2 seconds for more frequent updates
-                setTimeout(() => checkEmbeddingStatus(documentId, statusElement), 2000);
-            } else if (data.status === 'queued') {
-                const queueText = data.queue_position ? `Queued (#${data.queue_position})` : 'Queued';
-                updateStatusDisplay(statusElement, 'queued', queueText);
-                // Check again in 3 seconds
-                setTimeout(() => checkEmbeddingStatus(documentId, statusElement), 3000);
-            } else if (data.status === 'failed') {
-                const errorText = data.error ? 'Failed' : 'Failed';
-                updateStatusDisplay(statusElement, 'error', errorText);
-                // Add tooltip with error message if available
-                if (data.error && statusElement.querySelector('span')) {
-                    statusElement.querySelector('span').title = data.error;
-                }
-            } else if (data.status === 'duplicate') {
-                updateStatusDisplay(statusElement, 'duplicate', 'Duplicate');
-                // Add tooltip with error message
-                if (data.error && statusElement.querySelector('span')) {
-                    statusElement.querySelector('span').title = data.error;
-                }
-            } else if (data.status === 'error') {
-                updateStatusDisplay(statusElement, 'error', 'Error');
-            } else {
-                updateStatusDisplay(statusElement, 'pending', 'Pending');
-                // Check again in 3 seconds
-                setTimeout(() => checkEmbeddingStatus(documentId, statusElement), 3000);
-            }
-            
-        } catch (error) {
-            console.error('Error checking embedding status:', error);
-            updateStatusDisplay(statusElement, 'error', 'Error');
-        }
-    }
+    // Override loadDocuments to include status checking
+    const originalLoadDocuments = loadDocuments;
+    window.loadDocuments = loadDocuments = async function() {
+        await originalLoadDocuments.apply(this, arguments);
+        setTimeout(checkAllEmbeddingStatuses, 500); // Give DOM time to update
+    };
     
-    // Update the status display element
-    function updateStatusDisplay(element, status, text) {
-        const statusColors = {
-            'completed': 'bg-green-100 text-green-800',
-            'processing': 'bg-blue-100 text-blue-800',
-            'queued': 'bg-yellow-100 text-yellow-800',
-            'error': 'bg-red-100 text-red-800',
-            'duplicate': 'bg-orange-100 text-orange-800',
-            'pending': 'bg-gray-100 text-gray-800'
-        };
-        
-        const statusIcons = {
-            'completed': '<svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path></svg>',
-            'processing': '<svg class="animate-spin -ml-0.5 mr-1.5 h-3 w-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>',
-            'queued': '<svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd"></path></svg>',
-            'error': '<svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"></path></svg>',
-            'duplicate': '<svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20"><path d="M9 2a2 2 0 00-2 2v8a2 2 0 002 2h6a2 2 0 002-2V6.414A2 2 0 0016.414 5L14 2.586A2 2 0 0012.586 2H9z"></path><path d="M3 8a2 2 0 012-2v10h8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z"></path></svg>',
-            'pending': '<svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd"></path></svg>'
-        };
-        
-        const colorClass = statusColors[status] || statusColors['pending'];
-        const icon = statusIcons[status] || statusIcons['pending'];
-        
-        element.innerHTML = `
-            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${colorClass} transition-opacity duration-200" style="opacity: 1">
-                ${icon}
-                ${text}
-            </span>
-        `;
-    }
+    // Also check statuses on initial page load
+    setTimeout(checkAllEmbeddingStatuses, 1000);
+    
 });

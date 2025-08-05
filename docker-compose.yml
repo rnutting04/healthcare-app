@@ -1,6 +1,6 @@
 services:
   postgres:
-    image: postgres:15-alpine
+    image: pgvector/pgvector:pg15
     environment:
       POSTGRES_DB: healthcare_db
       POSTGRES_USER: healthcare_user
@@ -149,33 +149,37 @@ services:
       - ./file-service:/app
       - file-storage:/app/media/encrypted_files
 
-  embedding-service:
+  rag-embedding-service:
     build:
-      context: ./embedding-service
+      context: ./rag-embedding-service
       dockerfile: Dockerfile
     ports:
       - "8007:8007"
     environment:
+      - DATABASE_SERVICE_URL=http://database-service:8004
+      - FILE_SERVICE_URL=http://file-service:8006
+      - REDIS_URL=redis://redis:6379
+      - DATABASE_SERVICE_TOKEN=${DATABASE_SERVICE_TOKEN:-db-service-secret-token}
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-your-secret-key-here}
       - SECRET_KEY=${SECRET_KEY:-your-secret-key-here}
       - DEBUG=${DEBUG:-True}
       - ALLOWED_HOSTS=${ALLOWED_HOSTS:-*}
-      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-your-secret-key-here}
-      - DATABASE_SERVICE_URL=http://database-service:8004
-      - AUTH_SERVICE_URL=http://auth-service:8001
       - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - OPENAI_EMBEDDING_MODEL=${OPENAI_EMBEDDING_MODEL:-text-embedding-ada-002}
-      - OPENAI_MAX_TOKENS_PER_CHUNK=${OPENAI_MAX_TOKENS_PER_CHUNK:-8000}
-      - MAX_CONCURRENT_EMBEDDINGS=${MAX_CONCURRENT_EMBEDDINGS:-3}
-      - EMBEDDING_RETRY_MAX_ATTEMPTS=${EMBEDDING_RETRY_MAX_ATTEMPTS:-3}
-      - EMBEDDING_RETRY_DELAY=${EMBEDDING_RETRY_DELAY:-60}
-      - MAX_FILE_SIZE=${MAX_FILE_SIZE:-52428800}
-      - ALLOWED_FILE_TYPES=${ALLOWED_FILE_TYPES:-.pdf,.txt,.doc,.docx}
+      - OPENAI_EMBEDDING_MODEL=${OPENAI_EMBEDDING_MODEL:-text-embedding-3-small}
+      - RAG_CHUNK_SIZE=${RAG_CHUNK_SIZE:-1000}
+      - RAG_CHUNK_OVERLAP=${RAG_CHUNK_OVERLAP:-200}
+      - RAG_MAX_CONCURRENT_PROCESSING=${RAG_MAX_CONCURRENT_PROCESSING:-3}
+      - RAG_PROCESSING_TIMEOUT=${RAG_PROCESSING_TIMEOUT:-300}
+      - RAG_RETRY_MAX_ATTEMPTS=${RAG_RETRY_MAX_ATTEMPTS:-3}
+      - RAG_RETRY_DELAY=${RAG_RETRY_DELAY:-60}
+      - REDIS_DB=${REDIS_DB:-1}
     depends_on:
       - database-service
-      - auth-service
+      - file-service
+      - redis
     volumes:
-      - ./embedding-service:/app
-      - embedding-temp:/app/media/temp_files
+      - ./rag-embedding-service:/app
+      - rag-temp-files:/app/media/temp_files
 
   nginx:
     build:
@@ -190,7 +194,7 @@ services:
       - database-service
       - admin-service
       - file-service
-      - embedding-service
+      - rag-embedding-service
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - patient-static:/patient-static
@@ -218,4 +222,4 @@ volumes:
   auth-static:
   admin-static:
   file-storage:
-  embedding-temp:
+  rag-temp-files:

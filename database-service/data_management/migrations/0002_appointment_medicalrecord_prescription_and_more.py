@@ -14,66 +14,6 @@ class Migration(migrations.Migration):
 
     operations = [
         migrations.CreateModel(
-            name='Appointment',
-            fields=[
-                ('id', models.BigAutoField(primary_key=True, serialize=False)),
-                ('clinician_id', models.IntegerField()),
-                ('clinician_name', models.CharField(max_length=255)),
-                ('appointment_date', models.DateTimeField()),
-                ('duration_minutes', models.IntegerField(default=30)),
-                ('status', models.CharField(choices=[('SCHEDULED', 'Scheduled'), ('CONFIRMED', 'Confirmed'), ('IN_PROGRESS', 'In Progress'), ('COMPLETED', 'Completed'), ('CANCELLED', 'Cancelled'), ('NO_SHOW', 'No Show')], default='SCHEDULED', max_length=20)),
-                ('reason', models.TextField()),
-                ('notes', models.TextField(blank=True)),
-                ('created_at', models.DateTimeField(auto_now_add=True)),
-                ('updated_at', models.DateTimeField(auto_now=True)),
-            ],
-            options={
-                'db_table': 'appointments',
-                'managed': False,
-            },
-        ),
-        migrations.CreateModel(
-            name='MedicalRecord',
-            fields=[
-                ('id', models.BigAutoField(primary_key=True, serialize=False)),
-                ('clinician_id', models.IntegerField()),
-                ('clinician_name', models.CharField(max_length=255)),
-                ('record_type', models.CharField(choices=[('CONSULTATION', 'Consultation'), ('LAB_RESULT', 'Lab Result'), ('PRESCRIPTION', 'Prescription'), ('IMAGING', 'Imaging'), ('PROCEDURE', 'Procedure'), ('VACCINATION', 'Vaccination')], max_length=20)),
-                ('title', models.CharField(max_length=255)),
-                ('description', models.TextField()),
-                ('diagnosis', models.TextField(blank=True)),
-                ('treatment', models.TextField(blank=True)),
-                ('attachments', models.JSONField(blank=True, default=list)),
-                ('created_at', models.DateTimeField(auto_now_add=True)),
-                ('updated_at', models.DateTimeField(auto_now=True)),
-            ],
-            options={
-                'db_table': 'medical_records',
-                'managed': False,
-            },
-        ),
-        migrations.CreateModel(
-            name='Prescription',
-            fields=[
-                ('id', models.BigAutoField(primary_key=True, serialize=False)),
-                ('clinician_id', models.IntegerField()),
-                ('clinician_name', models.CharField(max_length=255)),
-                ('medication_name', models.CharField(max_length=255)),
-                ('dosage', models.CharField(max_length=100)),
-                ('frequency', models.CharField(max_length=100)),
-                ('duration', models.CharField(max_length=100)),
-                ('instructions', models.TextField()),
-                ('start_date', models.DateField()),
-                ('end_date', models.DateField()),
-                ('is_active', models.BooleanField(default=True)),
-                ('created_at', models.DateTimeField(auto_now_add=True)),
-            ],
-            options={
-                'db_table': 'prescriptions',
-                'managed': False,
-            },
-        ),
-        migrations.CreateModel(
             name='ChunkEmbedding',
             fields=[
                 ('id', models.UUIDField(default=uuid.uuid4, editable=False, primary_key=True, serialize=False)),

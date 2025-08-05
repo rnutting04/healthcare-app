@@ -7,6 +7,7 @@ from django.conf import settings
 from .services import DatabaseService
 import logging
 import requests
+import json
 
 logger = logging.getLogger(__name__)
 
@@ -189,8 +190,6 @@ def cancer_type_delete(request, cancer_type_id):
         messages.error(request, f"Error deleting cancer type: {str(e)}")
     
     return redirect('cancer_types_list')
-
-
 
 # User Management Views
 def users_list(request):
@@ -434,48 +433,32 @@ def document_upload(request):
                                 'size': file.size
                             })
                             
-                            # Send file to embedding service
+                            # Trigger embedding process in rag-embedding-service
                             try:
-                                # First, retrieve the unencrypted file from file service
-                                file_url = f"{settings.FILE_SERVICE_URL}/api/files/{file_id}"
-                                file_response = requests.get(file_url, headers=headers)
+                                embedding_url = f"{settings.RAG_EMBEDDING_SERVICE_URL}/api/rag/embeddings/process/"
+                                embedding_data = {
+                                    'document_id': file_id,
+                                    'cancer_type_id': cancer_type_id
+                                }
+                                embedding_headers = {'Authorization': f'Bearer {token}'}
                                 
-                                if file_response.status_code == 200:
-                                    # Now send to embedding service
-                                    embedding_url = f"{settings.EMBEDDING_SERVICE_URL}/embeddings/process/"
-                                    
-                                    # Get file content and prepare for multipart upload
-                                    file_content = file_response.content
-                                    files_for_embedding = {
-                                        'file': (file.name, file_content, file_response.headers.get('Content-Type', 'application/octet-stream'))
-                                    }
-                                    embedding_data = {
-                                        'document_id': file_id,
-                                        'priority': 1  # Higher priority for admin uploads
-                                    }
-                                    
-                                    embedding_response = requests.post(
-                                        embedding_url,
-                                        files=files_for_embedding,
-                                        data=embedding_data,
-                                        headers={'Authorization': f'Bearer {token}'}
-                                    )
-                                    
-                                    if embedding_response.status_code == 200:
-                                        embedding_result = embedding_response.json()
-                                        uploaded_files[-1]['embedding_status'] = 'queued'
-                                        uploaded_files[-1]['queue_position'] = embedding_result.get('queue_position', 'N/A')
-                                        logger.info(f"File {file_id} queued for embedding processing")
-                                    else:
-                                        logger.error(f"Failed to queue file for embedding: {embedding_response.text}")
-                                        uploaded_files[-1]['embedding_status'] = 'failed'
+                                embedding_response = requests.post(
+                                    embedding_url, 
+                                    json=embedding_data, 
+                                    headers=embedding_headers
+                                )
+                                
+                                if embedding_response.status_code == 202:
+                                    embedding_result = embedding_response.json()
+                                    uploaded_files[-1]['embedding_job_id'] = embedding_result.get('job_id')
+                                    uploaded_files[-1]['embedding_status'] = 'queued'
                                 else:
-                                    logger.error(f"Failed to retrieve file for embedding: {file_response.status_code}")
+                                    logger.warning(f"Embedding service returned {embedding_response.status_code} for {file.name}")
                                     uploaded_files[-1]['embedding_status'] = 'failed'
-                                    
                             except Exception as e:
-                                logger.error(f"Error sending file to embedding service: {str(e)}")
+                                logger.error(f"Failed to trigger embedding for {file.name}: {str(e)}")
                                 uploaded_files[-1]['embedding_status'] = 'error'
+                                
                         else:
                             errors.append(f"Failed to associate {file.name} with cancer type")
                     else:
@@ -584,20 +567,7 @@ def api_delete_rag_document(request, file_id):
             logger.error(f"Failed to delete file from file service: {file_response.status_code}")
             # Continue with database deletion even if file deletion fails
         
-        # Step 2: Delete embeddings and chunks from database service
-        embedding_headers = {
-            'X-Service-Token': getattr(settings, 'DATABASE_SERVICE_TOKEN', 'db-service-secret-token')
-        }
-        embedding_response = requests.delete(
-            f"{settings.DATABASE_SERVICE_URL}/api/embeddings/{file_id}/delete/",
-            headers=embedding_headers
-        )
-        
-        if embedding_response.status_code not in [200, 204, 404]:
-            logger.error(f"Failed to delete embeddings from database: {embedding_response.status_code}")
-            # Continue with RAG document deletion even if embedding deletion fails
-        
-        # Step 3: Delete the RAG document from database service
+        # Step 2: Delete the RAG document from database service
         db_headers = {
             'X-Service-Token': getattr(settings, 'DATABASE_SERVICE_TOKEN', 'db-service-secret-token')
         }
@@ -611,7 +581,7 @@ def api_delete_rag_document(request, file_id):
             logger.error(f"Failed to delete RAG document from database: {db_response.status_code}")
             return JsonResponse({'error': 'Failed to delete document record'}, status=500)
         
-        return JsonResponse({'message': 'Document and embeddings deleted successfully'})
+        return JsonResponse({'message': 'Document deleted successfully'})
         
     except Exception as e:
         logger.error(f"Error deleting RAG document: {str(e)}")
@@ -619,28 +589,127 @@ def api_delete_rag_document(request, file_id):
 
 # API endpoint for checking embedding status
 def api_embedding_status(request, document_id):
-    """Check embedding status for a specific document"""
+    """Check embedding status for a document"""
     try:
         # Get JWT token for authentication
         token = request.COOKIES.get('access_token')
-        headers = {'Authorization': f'Bearer {token}'}
+        if not token:
+            return JsonResponse({'error': 'Authentication required'}, status=401)
         
-        # Check embedding status
-        embedding_url = f"{settings.EMBEDDING_SERVICE_URL}/embeddings/status/{document_id}/"
-        response = requests.get(embedding_url, headers=headers)
+        # First check if document has embeddings in database
+        db_headers = {
+            'X-Service-Token': getattr(settings, 'DATABASE_SERVICE_TOKEN', 'db-service-secret-token')
+        }
         
-        if response.status_code == 200:
-            return JsonResponse(response.json())
-        else:
-            return JsonResponse({
-                'error': 'Failed to get embedding status',
-                'status': 'unknown'
-            }, status=response.status_code)
-            
+        # Check for embedding job status
+        job_response = requests.get(
+            f"{settings.DATABASE_SERVICE_URL}/api/rag/embedding-jobs/?document={document_id}&ordering=-created_at",
+            headers=db_headers
+        )
+        
+        if job_response.status_code == 200:
+            job_data = job_response.json()
+            # Handle paginated response
+            if isinstance(job_data, dict) and 'results' in job_data:
+                jobs = job_data.get('results', [])
+                if jobs and len(jobs) > 0:
+                    latest_job = jobs[0]
+                    status = latest_job.get('status', 'unknown')
+                    
+                    # Map job status to response
+                    if status == 'completed':
+                        # Check for actual embeddings
+                        check_response = requests.get(
+                            f"{settings.DATABASE_SERVICE_URL}/api/rag/embeddings/?document={document_id}",
+                            headers=db_headers
+                        )
+                        if check_response.status_code == 200:
+                            embeddings_data = check_response.json()
+                            count = embeddings_data.get('count', 0) if isinstance(embeddings_data, dict) else len(embeddings_data)
+                            return JsonResponse({
+                                'status': 'completed',
+                                'progress': 100,
+                                'message': f"Embeddings created: {count} chunks",
+                                'chunks_count': count
+                            })
+                    elif status == 'processing':
+                        # Parse message to get progress data if available
+                        message_text = latest_job.get('message', 'Processing document...')
+                        progress_data = {}
+                        try:
+                            message_obj = json.loads(message_text)
+                            if isinstance(message_obj, dict):
+                                message_text = message_obj.get('text', message_text)
+                                progress_data = message_obj.get('progress', {})
+                        except:
+                            pass
+                        
+                        return JsonResponse({
+                            'status': 'processing',
+                            'job_id': latest_job.get('id'),
+                            'message': message_text,
+                            'progress': progress_data
+                        })
+                    elif status == 'pending':
+                        return JsonResponse({
+                            'status': 'pending',
+                            'job_id': latest_job.get('id'),
+                            'progress': 0,
+                            'message': 'Document queued for processing'
+                        })
+                    elif status == 'failed':
+                        return JsonResponse({
+                            'status': 'error',
+                            'progress': 0,
+                            'message': latest_job.get('message', 'Processing failed')
+                        })
+                    elif status == 'retrying':
+                        return JsonResponse({
+                            'status': 'processing',
+                            'progress': 30,
+                            'message': f"Retrying... (attempt {latest_job.get('retry_count', 0) + 1})"
+                        })
+        
+        # If no job found, check if embeddings exist
+        check_response = requests.get(
+            f"{settings.DATABASE_SERVICE_URL}/api/rag/embeddings/?document={document_id}",
+            headers=db_headers
+        )
+        
+        if check_response.status_code == 200:
+            embeddings_data = check_response.json()
+            # Handle DRF paginated response
+            if isinstance(embeddings_data, dict) and 'results' in embeddings_data:
+                count = embeddings_data.get('count', 0)
+                if count > 0:
+                    return JsonResponse({
+                        'status': 'completed',
+                        'progress': 100,
+                        'message': f"Embeddings created: {count} chunks",
+                        'chunks_count': count
+                    })
+            # Handle list response
+            elif isinstance(embeddings_data, list):
+                count = len(embeddings_data)
+                if count > 0:
+                    return JsonResponse({
+                        'status': 'completed',
+                        'progress': 100,
+                        'message': f"Embeddings created: {count} chunks",
+                        'chunks_count': count
+                    })
+        
+        # Default status
+        return JsonResponse({
+            'status': 'not_started',
+            'progress': 0,
+            'message': 'Embedding not started'
+        })
+        
     except Exception as e:
         logger.error(f"Error checking embedding status: {str(e)}")
         return JsonResponse({
-            'error': 'Failed to check embedding status',
+            'error': 'Failed to check status',
             'status': 'error'
         }, status=500)
 

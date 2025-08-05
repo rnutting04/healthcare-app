@@ -12,9 +12,9 @@ echo "PostgreSQL started"
 echo "Waiting for auth-service to initialize..."
 sleep 10
 
-# Run only app-specific migrations
-echo "Running clinician migrations..."
-python manage.py migrate clinicians --noinput || true
+# Run migrations
+echo "Running clinician service migrations..."
+python manage.py migrate --noinput || true
 
 # Start the server
 echo "Starting server..."
