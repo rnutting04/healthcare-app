@@ -1,0 +1,92 @@
+/* RAG Chatbot Styles */
+
+/* Chat messages container */
+#chatMessages {
+    scrollbar-width: thin;
+    scrollbar-color: #cbd5e0 #f7fafc;
+}
+
+#chatMessages::-webkit-scrollbar {
+    width: 6px;
+}
+
+#chatMessages::-webkit-scrollbar-track {
+    background: #f7fafc;
+    border-radius: 3px;
+}
+
+#chatMessages::-webkit-scrollbar-thumb {
+    background: #cbd5e0;
+    border-radius: 3px;
+}
+
+#chatMessages::-webkit-scrollbar-thumb:hover {
+    background: #a0aec0;
+}
+
+/* Typing indicator animation */
+@keyframes bounce {
+    0%, 80%, 100% {
+        transform: scale(0.8);
+        opacity: 0.5;
+    }
+    40% {
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+
+.animate-bounce {
+    animation: bounce 1.4s infinite ease-in-out both;
+}
+
+/* Chat input textarea */
+#chatInput {
+    min-height: 2.5rem;
+    max-height: 120px;
+    resize: none;
+}
+
+/* Message bubbles */
+.message-bubble {
+    word-wrap: break-word;
+    word-break: break-word;
+}
+
+/* Context badge */
+#chatContextBadge {
+    cursor: help;
+}
+
+/* Responsive adjustments */
+@media (max-width: 640px) {
+    #chatMessages {
+        height: 300px;
+    }
+    
+    .max-w-xs {
+        max-width: 85%;
+    }
+}
+
+/* Loading state for send button */
+#sendChatButton:disabled {
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+/* Error message styling */
+.error-message {
+    background-color: #fef2f2;
+    border: 1px solid #fecaca;
+    color: #991b1b;
+}
+
+/* Source citation styling */
+.source-citation {
+    font-size: 0.75rem;
+    color: #6b7280;
+    margin-top: 0.5rem;
+    padding-top: 0.5rem;
+    border-top: 1px solid #e5e7eb;
+}
