@@ -242,97 +242,126 @@ def user_detail(request, user_id):
     try:
         from datetime import datetime
         
-        response = DatabaseService.get_user(user_id)
-        # The database-service returns the user directly, not wrapped in 'data'
-        user_data = response
+        # Get user data
+        user_data = DatabaseService.get_user(user_id)
         
-        # Convert date strings to datetime objects for template formatting
-        if user_data.get('date_joined'):
-            try:
-                user_data['date_joined'] = datetime.fromisoformat(user_data['date_joined'].replace('Z', '+00:00'))
-            except:
-                pass
-        if user_data.get('last_login'):
-            try:
-                user_data['last_login'] = datetime.fromisoformat(user_data['last_login'].replace('Z', '+00:00'))
-            except:
-                pass
-        
-        # If user is a patient, fetch patient-specific information
-        patient_data = None
-        languages = []
-        if user_data.get('role_name') == 'PATIENT':
-            try:
-                patient_response = DatabaseService.get_patient_by_user(user_id)
-                patient_data = patient_response
-                # logger.info(f"Successfully fetched patient data for user {user_id}: {patient_data}")
-                
-                # Fetch available languages
+        # Convert date strings to datetime objects
+        for field in ['date_joined', 'last_login']:
+            if user_data.get(field):
                 try:
-                    # Use the user's token from cookies or create a service token
-                    auth_header = None
-                    
-                    # First try to get token from cookies
-                    access_token = request.COOKIES.get('access_token')
-                    if access_token:
-                        auth_header = f'Bearer {access_token}'
-                    else:
-                        # If no user token, use a service account approach
-                        # For now, use the admin's token that was used to fetch patient data
-                        auth_header = request.META.get('HTTP_AUTHORIZATION', '')
-                    
-                    headers = {}
-                    if auth_header:
-                        headers['Authorization'] = auth_header
-                    
-                    # logger.info(f"Fetching languages from: {settings.PATIENT_SERVICE_URL}/api/patients/languages/")
-                    languages_response = requests.get(
-                        f"{settings.PATIENT_SERVICE_URL}/api/patients/languages/",
-                        headers=headers
-                    )
-                    # logger.info(f"Languages response status: {languages_response.status_code}")
-                    # logger.info(f"Auth header being sent: {auth_header}")
-                    if languages_response.status_code == 200:
-                        languages_data = languages_response.json()
-                        # logger.info(f"Languages response data: {languages_data}")
-                        # Handle paginated response
-                        # Ensure we're updating the outer scope languages variable
-                        if isinstance(languages_data, list):
-                            languages = languages_data
-                        else:
-                            languages = languages_data.get('results', languages_data)
-                        # logger.info(f"Fetched {len(languages)} languages")
-                        # logger.info(f"Languages list: {languages}")
-                        
-                        # Log the preferred language to debug
-                        if patient_data:
-                            # logger.info(f"Patient preferred_language value: {patient_data.get('preferred_language')}")
-                            pass
-                    else:
-                        # logger.warning(f"Failed to fetch languages: {languages_response.status_code}")
-                        # logger.warning(f"Response content: {languages_response.text}")
-                        pass
-                except Exception as e:
-                    # logger.warning(f"Could not fetch languages: {str(e)}")
+                    user_data[field] = datetime.fromisoformat(user_data[field].replace('Z', '+00:00'))
+                except:
                     pass
-            except Exception as e:
-                # logger.warning(f"Could not fetch patient data for user {user_id}: {str(e)}")
-                pass
         
-        # logger.info(f"DEBUG: Languages before context: {languages}")
-        # logger.info(f"DEBUG: Number of languages: {len(languages)}")
-        
+        # Initialize context data
         context = {
-            'user': user_data,  # Template expects 'user'
-            'patient_data': patient_data,  # Patient-specific data
-            'current_user': request.user_data,  # Current logged-in user
-            'languages': languages  # Available languages
+            'user': user_data,
+            'current_user': request.user_data,
+            'patient_data': None,
+            'clinician_data': None,
+            'languages': [],
+            'cancer_types': []
         }
+        
+        # Get role-specific data
+        role = user_data.get('role_name')
+        
+        if role == 'PATIENT':
+            context['patient_data'] = _get_patient_data(user_id)
+            context['languages'] = _get_languages(request)
+            # Get patient assignment if patient data exists
+            if context['patient_data']:
+                context['assignment_data'] = _get_patient_assignment(context['patient_data']['id'])
+                context['cancer_subtypes'] = _get_all_cancer_subtypes()
+                context['available_clinicians'] = _get_available_clinicians()
+        elif role == 'CLINICIAN':
+            context['clinician_data'] = _get_clinician_data(user_id)
+            context['cancer_types'] = _get_parent_cancer_types()
+        
         return render(request, 'user_detail.html', context)
+        
     except Exception as e:
         logger.error(f"User detail error: {str(e)}")
         messages.error(request, f"Error loading user details: {str(e)}")
         return redirect('users_list')
+
+def _get_patient_data(user_id):
+    """Helper to get patient data"""
+    try:
+        return DatabaseService.get_patient_by_user(user_id)
+    except Exception as e:
+        logger.warning(f"Could not fetch patient data for user {user_id}: {str(e)}")
+        return None
+
+def _get_clinician_data(user_id):
+    """Helper to get clinician data"""
+    try:
+        return DatabaseService.get_clinician_by_user(user_id)
+    except Exception as e:
+        logger.warning(f"Could not fetch clinician data for user {user_id}: {str(e)}")
+        return None
+
+def _get_languages(request):
+    """Helper to get available languages"""
+    try:
+        token = request.COOKIES.get('access_token') or request.META.get('HTTP_AUTHORIZATION', '')
+        headers = {'Authorization': f'Bearer {token}'} if token else {}
+        
+        response = requests.get(f"{settings.PATIENT_SERVICE_URL}/api/patients/languages/", headers=headers)
+        if response.status_code == 200:
+            data = response.json()
+            return data if isinstance(data, list) else data.get('results', [])
+    except Exception as e:
+        logger.warning(f"Could not fetch languages: {str(e)}")
+    return []
+
+def _get_parent_cancer_types():
+    """Helper to get parent cancer types"""
+    try:
+        response = DatabaseService.get_cancer_types()
+        data = response if isinstance(response, list) else response.get('results', [])
+        return [ct for ct in data if ct.get('parent') is None]
+    except Exception as e:
+        logger.warning(f"Could not fetch cancer types: {str(e)}")
+        return []
+
+def _get_patient_assignment(patient_id):
+    """Helper to get patient assignment"""
+    try:
+        return DatabaseService.get_patient_assignment(patient_id)
+    except Exception as e:
+        logger.warning(f"Could not fetch patient assignment: {str(e)}")
+        return None
+
+def _get_all_cancer_subtypes():
+    """Helper to get all cancer subtypes grouped by parent"""
+    try:
+        response = DatabaseService.get_cancer_types()
+        data = response if isinstance(response, list) else response.get('results', [])
+        
+        # Group subtypes by parent
+        grouped = {}
+        for ct in data:
+            if ct.get('parent'):
+                parent_id = ct['parent']
+                parent_name = ct.get('parent_details', {}).get('cancer_type', f'Parent {parent_id}')
+                
+                if parent_name not in grouped:
+                    grouped[parent_name] = []
+                grouped[parent_name].append(ct)
+        
+        return grouped
+    except Exception as e:
+        logger.warning(f"Could not fetch cancer subtypes: {str(e)}")
+        return {}
+
+def _get_available_clinicians():
+    """Helper to get available clinicians"""
+    try:
+        return DatabaseService.get_available_clinicians()
+    except Exception as e:
+        logger.warning(f"Could not fetch clinicians: {str(e)}")
+        return []
 
 # Patient Management
 @require_http_methods(["POST"])
@@ -381,6 +410,88 @@ def update_patient_info(request, patient_id):
                 return redirect('user_detail', user_id=user_data['id'])
     except:
         pass
+    
+    return redirect('users_list')
+
+# Clinician Management
+@require_http_methods(["POST"])
+def update_clinician_info(request, clinician_id):
+    """Update clinician information"""
+    try:
+        data = {}
+        
+        # Get phone number if provided
+        phone = request.POST.get('phone_number')
+        if phone is not None:
+            data['phone_number'] = phone
+        
+        # Get specialization if provided
+        specialization = request.POST.get('specialization_id')
+        if specialization:
+            data['specialization'] = int(specialization) if specialization else None
+        
+        # Update clinician info via database service
+        if data:
+            DatabaseService.update_clinician(clinician_id, data)
+            messages.success(request, "Clinician information updated successfully")
+        
+    except Exception as e:
+        logger.error(f"Clinician update error: {str(e)}")
+        messages.error(request, f"Error updating clinician information: {str(e)}")
+    
+    # Redirect back to user detail page
+    referrer = request.META.get('HTTP_REFERER')
+    if referrer and '/users/' in referrer:
+        try:
+            user_id = referrer.split('/users/')[-1].rstrip('/')
+            return redirect('user_detail', user_id=user_id)
+        except:
+            pass
+    
+    return redirect('users_list')
+
+# Patient Assignment Management
+@require_http_methods(["POST"])
+def update_patient_assignment(request, patient_id):
+    """Update patient assignment (cancer subtype and clinician)"""
+    try:
+        data = {
+            'patient': patient_id,  # Use 'patient' not 'patient_id' to match model field
+            'updated_by': request.user_data.get('user_id')  # Current admin user
+        }
+        
+        # Get cancer subtype if provided
+        cancer_subtype = request.POST.get('cancer_subtype_id')
+        if cancer_subtype:
+            data['cancer_subtype'] = int(cancer_subtype)
+        
+        # Get assigned clinician if provided
+        clinician = request.POST.get('assigned_clinician_id')
+        if clinician and clinician != "":
+            data['assigned_clinician'] = int(clinician)
+        else:
+            data['assigned_clinician'] = None
+        
+        # Get notes if provided
+        notes = request.POST.get('assignment_notes', '')
+        data['notes'] = notes
+        
+        # Create or update assignment
+        DatabaseService.create_or_update_patient_assignment(data)
+        messages.success(request, "Patient assignment updated successfully")
+        
+    except Exception as e:
+        logger.error(f"Patient assignment update error: {str(e)}")
+        messages.error(request, f"Error updating patient assignment: {str(e)}")
+    
+    # Redirect back to user detail page
+    referrer = request.META.get('HTTP_REFERER')
+    if referrer and '/users/' in referrer:
+        try:
+            user_id = referrer.split('/users/')[-1].rstrip('/')
+            return redirect('user_detail', user_id=user_id)
+        except:
+            pass
     
     return redirect('users_list')
 

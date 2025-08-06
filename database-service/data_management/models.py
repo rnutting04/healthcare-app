@@ -87,8 +87,28 @@ class Patient(models.Model):
     def __str__(self):
         return f"Patient {self.user_id}"
 
-# Clinician model removed as requested
-# Appointment, Prescription, and MedicalRecord models removed as requested
+class Clinician(models.Model):
+    id = models.BigAutoField(primary_key=True)
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='clinician_profile')
+    specialization = models.ForeignKey(
+        'CancerType', 
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        limit_choices_to={'parent__isnull': True},  # Only parent cancer types
+        related_name='clinicians'
+    )
+    phone_number = models.CharField(max_length=20, blank=True, default='')
+    is_available = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        db_table = 'clinicians'
+    
+    def __str__(self):
+        specialization_name = self.specialization.cancer_type if self.specialization else "No specialization"
+        return f"Dr. {self.user.first_name} {self.user.last_name} - {specialization_name}"
 
 class CancerType(models.Model):
     cancer_type = models.CharField(max_length=200)
@@ -167,6 +187,44 @@ class FileMetadata(models.Model):
     
     def __str__(self):
         return f"{self.filename} - {self.user.email}"
+
+
+class PatientAssignment(models.Model):
+    id = models.BigAutoField(primary_key=True)
+    patient = models.OneToOneField(Patient, on_delete=models.CASCADE, related_name='assignment')
+    cancer_subtype = models.ForeignKey(
+        CancerType, 
+        on_delete=models.PROTECT,
+        limit_choices_to={'parent__isnull': False},  # Only subtypes (have parent)
+        related_name='patient_assignments'
+    )
+    assigned_clinician = models.ForeignKey(
+        Clinician,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='assigned_patients'
+    )
+    notes = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    updated_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name='patient_assignments_updated'
+    )
+    
+    class Meta:
+        db_table = 'patient_assignments'
+        indexes = [
+            models.Index(fields=['patient']),
+            models.Index(fields=['assigned_clinician']),
+            models.Index(fields=['cancer_subtype']),
+        ]
+    
+    def __str__(self):
+        return f"Assignment for Patient {self.patient.id} - {self.cancer_subtype.cancer_type}"
 
 
 class FileAccessLog(models.Model):

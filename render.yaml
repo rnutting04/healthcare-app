@@ -117,6 +117,7 @@ services:
       - key: PORT
         value: 8003
 
+
   # Database Service
   - type: web
     name: healthcare-database-service

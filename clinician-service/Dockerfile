@@ -12,14 +12,8 @@ RUN apt-get update && apt-get install -y \
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy application code
+# Copy the rest of the application
 COPY . .
-
-# Set environment variable for Django settings
-ENV DJANGO_SETTINGS_MODULE=settings
-
-# Create static and media directories
-RUN mkdir -p static media
 
 # Collect static files
 RUN python manage.py collectstatic --noinput || true

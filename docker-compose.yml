@@ -86,6 +86,7 @@ services:
     volumes:
       - ./clinician-service:/app
 
+
   database-service:
     build:
       context: ./database-service

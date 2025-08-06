@@ -19,6 +19,10 @@ urlpatterns = [
     
     # Patient Management
     path('admin/patients/<int:patient_id>/update/', views.update_patient_info, name='update_patient_info'),
+    path('admin/patients/<int:patient_id>/assignment/', views.update_patient_assignment, name='update_patient_assignment'),
+    
+    # Clinician Management
+    path('admin/clinicians/<int:clinician_id>/update/', views.update_clinician_info, name='update_clinician_info'),
     
     # Document Management for RAG
     path('admin/documents/upload/', views.document_upload, name='document_upload'),

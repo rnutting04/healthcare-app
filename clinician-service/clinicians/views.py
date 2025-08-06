@@ -1,247 +1,374 @@
-from rest_framework import viewsets, status, permissions
+from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from django.shortcuts import get_object_or_404
+from rest_framework.views import APIView
 from django.utils import timezone
 from datetime import datetime, timedelta
-from .models import Clinician, Schedule, PatientAssignment, ClinicianAppointment, MedicalNote
-from .serializers import (
-    ClinicianSerializer, ScheduleSerializer, PatientAssignmentSerializer,
-    ClinicianAppointmentSerializer, MedicalNoteSerializer, ClinicianDashboardSerializer
-)
-import requests
+from typing import Dict
+import jwt
+import uuid
+from .services import DatabaseService
 from django.conf import settings
+from .serializers import (
+    ClinicianRegistrationSerializer, ClinicianLoginSerializer,
+    ClinicianSerializer, ClinicianProfileUpdateSerializer,
+    TokenSerializer, RefreshTokenSerializer, ClinicianDashboardSerializer
+)
+import logging
 
-class ClinicianViewSet(viewsets.ModelViewSet):
-    queryset = Clinician.objects.all()
-    serializer_class = ClinicianSerializer
-    
-    def get_queryset(self):
-        # Clinicians can only see their own data, admins can see all
-        if hasattr(self.request, 'user_role'):
-            if self.request.user_role == 'CLINICIAN':
-                return self.queryset.filter(user_id=self.request.user_id)
-        return self.queryset
-    
-    def create(self, request):
-        # Create clinician profile when user registers
-        data = request.data.copy()
-        data['user_id'] = request.user_id
-        serializer = self.get_serializer(data=data)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    
-    @action(detail=False, methods=['get'])
-    def me(self, request):
-        # Get current clinician's profile
-        clinician = get_object_or_404(Clinician, user_id=request.user_id)
-        serializer = self.get_serializer(clinician)
-        return Response(serializer.data)
-    
-    @action(detail=False, methods=['get'])
-    def dashboard(self, request):
-        # Get clinician dashboard data
-        clinician = get_object_or_404(Clinician, user_id=request.user_id)
-        serializer = ClinicianDashboardSerializer(clinician)
-        return Response(serializer.data)
-    
-    @action(detail=False, methods=['get'])
-    def available(self, request):
-        # Get available clinicians
-        clinicians = self.queryset.filter(is_available=True)
-        serializer = self.get_serializer(clinicians, many=True)
-        return Response(serializer.data)
+logger = logging.getLogger(__name__)
 
-class ScheduleViewSet(viewsets.ModelViewSet):
-    queryset = Schedule.objects.all()
-    serializer_class = ScheduleSerializer
-    
-    def get_queryset(self):
-        # Filter schedules based on user role
-        if hasattr(self.request, 'user_role'):
-            if self.request.user_role == 'CLINICIAN':
-                clinician = get_object_or_404(Clinician, user_id=self.request.user_id)
-                return self.queryset.filter(clinician=clinician)
-        return self.queryset
-    
-    def create(self, request):
-        # Clinicians create their own schedules
-        clinician = get_object_or_404(Clinician, user_id=request.user_id)
-        data = request.data.copy()
-        data['clinician'] = clinician.id
-        
-        serializer = self.get_serializer(data=data)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-class PatientAssignmentViewSet(viewsets.ModelViewSet):
-    queryset = PatientAssignment.objects.all()
-    serializer_class = PatientAssignmentSerializer
+class ClinicianAuthViewSet(viewsets.ViewSet):
+    """ViewSet for clinician authentication"""
     
-    def get_queryset(self):
-        # Filter patient assignments based on user role
-        if hasattr(self.request, 'user_role'):
-            if self.request.user_role == 'CLINICIAN':
-                clinician = get_object_or_404(Clinician, user_id=self.request.user_id)
-                return self.queryset.filter(clinician=clinician)
-        return self.queryset
-    
-    def create(self, request):
-        # Clinicians assign patients to themselves
-        clinician = get_object_or_404(Clinician, user_id=request.user_id)
-        data = request.data.copy()
-        data['clinician'] = clinician.id
+    @action(detail=False, methods=['post'])
+    def signup(self, request):
+        """Register a new clinician"""
+        print(f"Signup request data: {request.data}")
+        serializer = ClinicianRegistrationSerializer(data=request.data)
+        if not serializer.is_valid():
+            print(f"Serializer errors: {serializer.errors}")
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         
-        serializer = self.get_serializer(data=data)
-        if serializer.is_valid():
-            serializer.save()
-            
-            # Notify database service
-            self._notify_database_service('patient_assigned', serializer.data)
-            
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    
-    @action(detail=True, methods=['post'])
-    def deactivate(self, request, pk=None):
-        assignment = self.get_object()
-        assignment.is_active = False
-        assignment.save()
+        validated_data = serializer.validated_data
+        print(f"Validated data: {validated_data}")
         
-        # Notify database service
-        self._notify_database_service('patient_unassigned', {'assignment_id': assignment.id})
-        
-        return Response({'message': 'Patient assignment deactivated'})
-    
-    def _notify_database_service(self, event_type, data):
         try:
-            requests.post(
-                f"{settings.DATABASE_SERVICE_URL}/api/events/",
-                json={
-                    'event_type': event_type,
-                    'service': 'clinician-service',
-                    'data': data
-                }
-            )
-        except:
-            pass
-
-class ClinicianAppointmentViewSet(viewsets.ModelViewSet):
-    queryset = ClinicianAppointment.objects.all()
-    serializer_class = ClinicianAppointmentSerializer
-    
-    def get_queryset(self):
-        # Filter appointments based on user role
-        if hasattr(self.request, 'user_role'):
-            if self.request.user_role == 'CLINICIAN':
-                clinician = get_object_or_404(Clinician, user_id=self.request.user_id)
-                return self.queryset.filter(clinician=clinician)
-        return self.queryset
-    
-    @action(detail=True, methods=['post'])
-    def update_status(self, request, pk=None):
-        appointment = self.get_object()
-        new_status = request.data.get('status')
-        
-        if new_status not in dict(ClinicianAppointment.STATUS_CHOICES):
-            return Response({'error': 'Invalid status'}, status=status.HTTP_400_BAD_REQUEST)
-        
-        appointment.status = new_status
-        appointment.save()
-        
-        # Notify database service
-        self._notify_database_service('appointment_status_updated', {
-            'appointment_id': appointment.id,
-            'status': new_status
-        })
-        
-        return Response({'message': f'Appointment status updated to {new_status}'})
-    
-    @action(detail=False, methods=['get'])
-    def today(self, request):
-        # Get today's appointments
-        clinician = get_object_or_404(Clinician, user_id=request.user_id)
-        today = timezone.now().date()
-        appointments = self.queryset.filter(
-            clinician=clinician,
-            appointment_date__date=today
-        ).order_by('appointment_date')
-        
-        serializer = self.get_serializer(appointments, many=True)
-        return Response(serializer.data)
-    
-    @action(detail=False, methods=['get'])
-    def upcoming(self, request):
-        # Get upcoming appointments
-        clinician = get_object_or_404(Clinician, user_id=request.user_id)
-        appointments = self.queryset.filter(
-            clinician=clinician,
-            appointment_date__gt=timezone.now(),
-            status__in=['SCHEDULED', 'CONFIRMED']
-        ).order_by('appointment_date')
-        
-        serializer = self.get_serializer(appointments, many=True)
-        return Response(serializer.data)
-    
-    def _notify_database_service(self, event_type, data):
-        try:
-            requests.post(
-                f"{settings.DATABASE_SERVICE_URL}/api/events/",
-                json={
-                    'event_type': event_type,
-                    'service': 'clinician-service',
-                    'data': data
-                }
-            )
-        except:
-            pass
-
-class MedicalNoteViewSet(viewsets.ModelViewSet):
-    queryset = MedicalNote.objects.all()
-    serializer_class = MedicalNoteSerializer
-    
-    def get_queryset(self):
-        # Filter medical notes based on user role
-        if hasattr(self.request, 'user_role'):
-            if self.request.user_role == 'CLINICIAN':
-                clinician = get_object_or_404(Clinician, user_id=self.request.user_id)
-                return self.queryset.filter(clinician=clinician)
-        return self.queryset
-    
-    def create(self, request):
-        # Clinicians create their own medical notes
-        clinician = get_object_or_404(Clinician, user_id=request.user_id)
-        data = request.data.copy()
-        data['clinician'] = clinician.id
-        
-        serializer = self.get_serializer(data=data)
-        if serializer.is_valid():
-            medical_note = serializer.save()
+            # Check if user already exists
+            existing_user = DatabaseService.get_user_by_email(validated_data['email'])
+            if existing_user:
+                return Response(
+                    {'error': 'User with this email already exists'}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
             
-            # Create medical record in database service
-            self._create_medical_record(medical_note)
+            # Create user with CLINICIAN role
+            user_data = {
+                'email': validated_data['email'],
+                'password': validated_data['password'],
+                'first_name': validated_data['first_name'],
+                'last_name': validated_data['last_name'],
+                'role': 'CLINICIAN'
+            }
             
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            user = DatabaseService.create_user(user_data)
+            logger.info(f"Created user: {user}")
+            
+            # Create clinician profile
+            clinician_data = {
+                'user_id': user['id'],
+                'specialization_id': validated_data['specialization_id'],
+                'phone_number': validated_data['phone_number']
+            }
+            logger.info(f"Creating clinician with data: {clinician_data}")
+            
+            clinician = DatabaseService.create_clinician(clinician_data)
+            logger.info(f"Created clinician: {clinician}")
+            
+            # Log event
+            DatabaseService.log_event('clinician_registered', 'clinician-service', {
+                'user_id': user['id'],
+                'clinician_id': clinician['id']
+            })
+            
+            # Generate tokens
+            tokens = self._generate_tokens(user)
+            
+            return Response({
+                'user': user,
+                'clinician': clinician,
+                'tokens': tokens
+            }, status=status.HTTP_201_CREATED)
+            
+        except Exception as e:
+            logger.error(f"Signup failed: {e}")
+            import traceback
+            traceback.print_exc()
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
     
-    def _create_medical_record(self, medical_note):
+    @action(detail=False, methods=['post'])
+    def login(self, request):
+        """Login a clinician"""
+        serializer = ClinicianLoginSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        
+        validated_data = serializer.validated_data
+        
         try:
-            requests.post(
-                f"{settings.DATABASE_SERVICE_URL}/api/medical-records/",
-                json={
-                    'patient_id': medical_note.patient_id,
-                    'clinician_id': medical_note.clinician.user_id,
-                    'clinician_name': f"Dr. {medical_note.clinician.first_name} {medical_note.clinician.last_name}",
-                    'record_type': 'CONSULTATION',
-                    'title': f"Consultation - {medical_note.chief_complaint[:50]}",
-                    'description': medical_note.history_of_present_illness,
-                    'diagnosis': medical_note.diagnosis,
-                    'treatment': medical_note.treatment_plan,
-                }
+            # Authenticate user
+            user = DatabaseService.authenticate_user(
+                validated_data['email'],
+                validated_data['password']
             )
-        except:
-            pass
+            
+            if not user:
+                return Response(
+                    {'error': 'Invalid credentials'}, 
+                    status=status.HTTP_401_UNAUTHORIZED
+                )
+            
+            # Check if user is a clinician
+            if user.get('role_name') != 'CLINICIAN':
+                return Response(
+                    {'error': 'Access denied. Clinicians only.'}, 
+                    status=status.HTTP_403_FORBIDDEN
+                )
+            
+            # Get clinician profile
+            clinician = DatabaseService.get_clinician_by_user_id(user['id'])
+            
+            # Log event
+            DatabaseService.log_event('clinician_login', 'clinician-service', {
+                'user_id': user['id']
+            })
+            
+            # Generate tokens
+            tokens = self._generate_tokens(user)
+            
+            return Response({
+                'user': user,
+                'clinician': clinician,
+                'tokens': tokens
+            })
+            
+        except Exception as e:
+            logger.error(f"Login failed: {e}")
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+    
+    @action(detail=False, methods=['post'])
+    def logout(self, request):
+        """Logout a clinician"""
+        # Get refresh token from request
+        refresh_token = request.data.get('refresh')
+        
+        if refresh_token:
+            # Invalidate the refresh token
+            DatabaseService.invalidate_refresh_token(refresh_token)
+        
+        # Log event
+        if hasattr(request, 'user_id'):
+            DatabaseService.log_event('clinician_logout', 'clinician-service', {
+                'user_id': request.user_id
+            })
+        
+        return Response({'message': 'Successfully logged out'})
+    
+    @action(detail=False, methods=['post'])
+    def refresh(self, request):
+        """Refresh access token"""
+        serializer = RefreshTokenSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        
+        refresh_token = serializer.validated_data['refresh']
+        
+        try:
+            # Verify refresh token
+            payload = jwt.decode(
+                refresh_token,
+                settings.JWT_SECRET_KEY,
+                algorithms=[settings.JWT_ALGORITHM]
+            )
+            
+            # Check if token exists in database
+            token_record = DatabaseService.get_refresh_token(refresh_token)
+            if not token_record or not token_record.get('is_active'):
+                return Response(
+                    {'error': 'Invalid refresh token'}, 
+                    status=status.HTTP_401_UNAUTHORIZED
+                )
+            
+            # Get user
+            user = DatabaseService.get_user(payload['user_id'])
+            if not user:
+                return Response(
+                    {'error': 'User not found'}, 
+                    status=status.HTTP_404_NOT_FOUND
+                )
+            
+            # Generate new access token
+            access_token = self._generate_access_token(user)
+            
+            return Response({
+                'access': access_token
+            })
+            
+        except jwt.ExpiredSignatureError:
+            return Response({'error': 'Refresh token expired'}, status=status.HTTP_401_UNAUTHORIZED)
+        except jwt.InvalidTokenError:
+            return Response({'error': 'Invalid refresh token'}, status=status.HTTP_401_UNAUTHORIZED)
+        except Exception as e:
+            logger.error(f"Token refresh failed: {e}")
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+    
+    def _generate_tokens(self, user: Dict) -> Dict[str, str]:
+        """Generate access and refresh tokens"""
+        access_token = self._generate_access_token(user)
+        refresh_token = self._generate_refresh_token(user)
+        
+        # Store refresh token in database
+        expires_at = timezone.now() + timedelta(minutes=settings.JWT_REFRESH_TOKEN_LIFETIME)
+        DatabaseService.create_refresh_token(
+            user_id=user['id'],
+            token=refresh_token,
+            expires_at=expires_at.isoformat()
+        )
+        
+        return {
+            'access': access_token,
+            'refresh': refresh_token
+        }
+    
+    def _generate_access_token(self, user: Dict) -> str:
+        """Generate access token"""
+        payload = {
+            'user_id': user['id'],
+            'email': user['email'],
+            'role': user.get('role_name', 'CLINICIAN'),
+            'exp': timezone.now() + timedelta(minutes=15),
+            'iat': timezone.now(),
+            'jti': str(uuid.uuid4())
+        }
+        
+        return jwt.encode(
+            payload,
+            settings.JWT_SECRET_KEY,
+            algorithm=settings.JWT_ALGORITHM
+        )
+    
+    def _generate_refresh_token(self, user: Dict) -> str:
+        """Generate refresh token"""
+        payload = {
+            'user_id': user['id'],
+            'token_type': 'refresh',
+            'exp': timezone.now() + timedelta(days=1),
+            'iat': timezone.now(),
+            'jti': str(uuid.uuid4())
+        }
+        
+        return jwt.encode(
+            payload,
+            settings.JWT_SECRET_KEY,
+            algorithm=settings.JWT_ALGORITHM
+        )
+
+
+class ClinicianProfileView(APIView):
+    """View for clinician profile management"""
+    
+    def get(self, request):
+        """Get current clinician's profile"""
+        try:
+            clinician = DatabaseService.get_clinician_by_user_id(request.user_id)
+            if not clinician:
+                return Response(
+                    {'error': 'Clinician profile not found'}, 
+                    status=status.HTTP_404_NOT_FOUND
+                )
+            
+            # Add user data
+            user = DatabaseService.get_user(request.user_id)
+            if user:
+                clinician['user'] = user
+            
+            serializer = ClinicianSerializer(clinician)
+            return Response(serializer.data)
+            
+        except Exception as e:
+            logger.error(f"Failed to get profile: {e}")
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
+    def put(self, request):
+        """Update clinician profile"""
+        serializer = ClinicianProfileUpdateSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            # Get current clinician
+            clinician = DatabaseService.get_clinician_by_user_id(request.user_id)
+            if not clinician:
+                return Response(
+                    {'error': 'Clinician profile not found'}, 
+                    status=status.HTTP_404_NOT_FOUND
+                )
+            
+            # Update user data if provided
+            user_updates = {}
+            if 'first_name' in serializer.validated_data:
+                user_updates['first_name'] = serializer.validated_data.pop('first_name')
+            if 'last_name' in serializer.validated_data:
+                user_updates['last_name'] = serializer.validated_data.pop('last_name')
+            
+            if user_updates:
+                # Update user via database service
+                # Note: This would require a new endpoint in database service
+                pass
+            
+            # Update clinician profile
+            updated_clinician = DatabaseService.update_clinician(
+                clinician['id'], 
+                serializer.validated_data
+            )
+            
+            # Log event
+            DatabaseService.log_event('clinician_profile_updated', 'clinician-service', {
+                'user_id': request.user_id,
+                'clinician_id': clinician['id']
+            })
+            
+            # Add user data
+            user = DatabaseService.get_user(request.user_id)
+            if user:
+                updated_clinician['user'] = user
+            
+            return Response(ClinicianSerializer(updated_clinician).data)
+            
+        except Exception as e:
+            logger.error(f"Failed to update profile: {e}")
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+
+class ClinicianDashboardView(APIView):
+    """View for clinician dashboard data"""
+    
+    def get(self, request):
+        """Get clinician dashboard data"""
+        try:
+            # Get clinician profile
+            clinician = DatabaseService.get_clinician_by_user_id(request.user_id)
+            
+            # Prepare dashboard data (stub implementation)
+            dashboard_data = {
+                'user_id': request.user_id,
+                'first_name': request.user_data.get('first_name', 'Clinician'),
+                'last_name': request.user_data.get('last_name', ''),
+                'email': request.user_data.get('email', ''),
+                'clinician_profile': clinician,
+                
+                # Stub statistics
+                'total_patients': 0,
+                'today_appointments': 0,
+                'pending_appointments': 0,
+                
+                # Empty lists for now
+                'upcoming_appointments': [],
+                'recent_patients': []
+            }
+            
+            if clinician:
+                # In a real implementation, these would fetch actual data
+                # For now, just return stub data
+                pass
+            
+            serializer = ClinicianDashboardSerializer(dashboard_data)
+            return Response(serializer.data)
+            
+        except Exception as e:
+            logger.error(f"Failed to get dashboard data: {e}")
+            return Response(
+                {'error': 'Failed to load dashboard'}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )

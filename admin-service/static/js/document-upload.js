@@ -503,30 +503,30 @@ document.addEventListener('DOMContentLoaded', function() {
             const documentNameHtml = createDocumentNameWithTooltip(doc.file_data.filename);
             
             row.innerHTML = `
-                <td class="px-6 py-4 text-sm font-medium text-gray-900 document-name-cell">
+                <td class="text-sm font-medium text-gray-900 document-name-cell">
                     ${documentNameHtml}
                 </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                <td class="text-sm text-gray-500">
                     ${doc.cancer_type}
                 </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                <td class="text-sm text-gray-500">
                     ${fileSize}
                 </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                <td class="text-sm text-gray-500">
                     ${uploadDate}
                 </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 type-column">
+                <td class="text-sm text-gray-500 type-column">
                     ${fileType}
                 </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                <td class="text-sm text-gray-500">
                     <div id="embedding-status-desktop-${doc.file}" class="embedding-status" data-document-id="${doc.file}">
                         <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800 animate-pulse">
                             Checking...
                         </span>
                     </div>
                 </td>
-                <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                    <div class="flex items-center justify-end space-x-3">
+                <td class="text-right text-sm font-medium">
+                    <div class="flex items-center justify-end space-x-2">
                         <button class="text-blue-600 hover:text-blue-900" onclick="downloadDocument('${doc.file}')">
                             Download
                         </button>

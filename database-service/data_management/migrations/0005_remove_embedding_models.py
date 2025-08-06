@@ -26,12 +26,12 @@ class Migration(migrations.Migration):
         # Then drop the tables if they exist
         migrations.RunSQL(
             sql="DROP TABLE IF EXISTS embedding_chunks CASCADE;",
-            reverse_sql="-- Cannot reverse table drop",
+            reverse_sql=migrations.RunSQL.noop,
             state_operations=[]
         ),
         migrations.RunSQL(
             sql="DROP TABLE IF EXISTS document_embeddings CASCADE;",
-            reverse_sql="-- Cannot reverse table drop",
+            reverse_sql=migrations.RunSQL.noop,
             state_operations=[]
         ),
     ]

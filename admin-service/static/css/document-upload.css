@@ -273,19 +273,55 @@
     opacity: 0;
 }
 
-/* Table layout - remove fixed layout to allow flexible columns */
+/* Table container - allow horizontal scroll on smaller screens */
+.table-container {
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
+}
+
+/* Table layout - responsive */
 #documentsTable {
     table-layout: auto;
     width: 100%;
-    min-width: 768px; /* Ensure minimum width for proper display */
+    border-collapse: separate;
+    border-spacing: 0;
 }
 
-/* Document name cell - add more spacing */
+/* Responsive column handling */
+#documentsTable th,
+#documentsTable td {
+    padding: 0.75rem 1rem;
+    white-space: nowrap;
+}
+
+/* Document name should be able to wrap */
+#documentsTable td:first-child {
+    white-space: normal;
+    word-break: break-word;
+    min-width: 150px;
+    max-width: 250px;
+}
+
+/* Make certain columns more compact */
+#documentsTable th:nth-child(3),
+#documentsTable td:nth-child(3), /* Size */
+#documentsTable th:nth-child(5),
+#documentsTable td:nth-child(5) { /* Type */
+    padding-left: 0.5rem;
+    padding-right: 0.5rem;
+}
+
+/* Actions column - compact */
+#documentsTable th:last-child,
+#documentsTable td:last-child {
+    padding-left: 0.5rem;
+    padding-right: 0.5rem;
+}
+
+/* Document name cell */
 .document-name-cell {
     position: relative;
-    min-width: 200px;
-    max-width: 300px;
-    padding-right: 1.5rem !important;
 }
 
 .document-name {
@@ -337,6 +373,53 @@
 }
 
 /* Responsive Design */
+@media (max-width: 1280px) {
+    /* Reduce padding on smaller screens */
+    #documentsTable th,
+    #documentsTable td {
+        padding: 0.5rem 0.75rem;
+        font-size: 0.875rem;
+    }
+    
+    /* Make upload date more compact */
+    #documentsTable td:nth-child(4) {
+        font-size: 0.75rem;
+    }
+}
+
+@media (max-width: 1024px) {
+    /* Further reduce padding */
+    #documentsTable th,
+    #documentsTable td {
+        padding: 0.5rem;
+        font-size: 0.813rem;
+    }
+    
+    /* Hide seconds in date */
+    #documentsTable td:nth-child(4) {
+        font-size: 0.75rem;
+    }
+    
+    /* Compact action buttons */
+    #documentsTable td:last-child button {
+        font-size: 0.813rem;
+        padding: 0.25rem 0.5rem;
+    }
+}
+
+@media (max-width: 768px) {
+    /* Table scrolls horizontally on tablets and below */
+    .table-container {
+        margin: 0 -1rem;
+        padding: 0 1rem;
+        overflow-x: auto;
+    }
+    
+    #documentsTable {
+        min-width: 700px;
+    }
+}
+
 @media (max-width: 640px) {
     .upload-dropzone {
         padding: 2rem 1rem;

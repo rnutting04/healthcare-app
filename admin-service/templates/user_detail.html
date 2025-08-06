@@ -164,6 +164,143 @@
                 </div>
             </div>
             {% endif %}
+            
+            <!-- Patient Assignment Section -->
+            {% if patient_data %}
+            <div class="mt-6 pt-6 border-t border-gray-200">
+                <h3 class="text-lg font-semibold text-gray-900 mb-4">Patient Assignment</h3>
+                <form id="patient-assignment-form" method="POST" action="/admin/patients/{{ patient_data.id }}/assignment/">
+                    {% csrf_token %}
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="md:col-span-2">
+                            <label class="block text-sm font-medium text-gray-500">Cancer Type/Subtype</label>
+                            <select name="cancer_subtype_id" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm" required>
+                                <option value="">Select Cancer Type/Subtype</option>
+                                {% for parent_name, subtypes in cancer_subtypes.items %}
+                                <optgroup label="{{ parent_name }}">
+                                    {% for subtype in subtypes %}
+                                    <option value="{{ subtype.id }}" {% if assignment_data and assignment_data.cancer_subtype == subtype.id %}selected{% endif %}>
+                                        {{ subtype.cancer_type }}
+                                    </option>
+                                    {% endfor %}
+                                </optgroup>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        
+                        <div class="md:col-span-2">
+                            <label class="block text-sm font-medium text-gray-500">Assigned Clinician</label>
+                            <select name="assigned_clinician_id" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
+                                <option value="">No Clinician Assigned</option>
+                                {% for clinician in available_clinicians %}
+                                <option value="{{ clinician.id }}" {% if assignment_data and assignment_data.assigned_clinician == clinician.id %}selected{% endif %}>
+                                    Dr. {{ clinician.user.first_name }} {{ clinician.user.last_name }}
+                                    {% if clinician.specialization_detail %}
+                                    - {{ clinician.specialization_detail.cancer_type }} Specialist
+                                    {% endif %}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        
+                        <div class="md:col-span-2">
+                            <label class="block text-sm font-medium text-gray-500">Notes</label>
+                            <textarea name="assignment_notes" rows="3" 
+                                      class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                                      placeholder="Add any relevant notes about this assignment">{{ assignment_data.notes|default:'' }}</textarea>
+                        </div>
+                        
+                        {% if assignment_data %}
+                        <div class="md:col-span-2 text-sm text-gray-500">
+                            Last updated: {{ assignment_data.updated_at|date:"F d, Y g:i A" }}
+                            {% if assignment_data.updated_by_detail %}
+                            by {{ assignment_data.updated_by_detail.name }}
+                            {% endif %}
+                        </div>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="mt-4 flex justify-end">
+                        <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-md transition-colors">
+                            Update Assignment
+                        </button>
+                    </div>
+                </form>
+            </div>
+            {% endif %}
+        </div>
+        {% endif %}
+
+        <!-- Clinician-specific Information -->
+        {% if user.role_name == 'CLINICIAN' %}
+        <div class="mt-6 pt-6 border-t border-gray-200">
+            <h3 class="text-lg font-semibold text-gray-900 mb-4">Clinician Information</h3>
+            {% if clinician_data %}
+            <form id="clinician-info-form" method="POST" action="/admin/clinicians/{{ clinician_data.id }}/update/">
+                {% csrf_token %}
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-500">Phone Number</label>
+                        <input type="tel" name="phone_number" value="{{ clinician_data.phone_number|default:'' }}" 
+                               class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                               placeholder="Enter phone number">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-500">Specialization</label>
+                        <select name="specialization_id" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
+                            <option value="">Select Specialization</option>
+                            {% for cancer_type in cancer_types %}
+                            <option value="{{ cancer_type.id }}" {% if clinician_data.specialization == cancer_type.id %}selected{% endif %}>
+                                {{ cancer_type.cancer_type }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-500">License Number</label>
+                        <div class="mt-1 text-sm text-gray-900">{{ clinician_data.license_number|default:'Not provided' }}</div>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-500">Availability Status</label>
+                        <div class="mt-1">
+                            {% if clinician_data.is_available %}
+                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+                                    Available
+                                </span>
+                            {% else %}
+                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">
+                                    Not Available
+                                </span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="mt-4 flex justify-end">
+                    <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-md transition-colors">
+                        Update Clinician Information
+                    </button>
+                </div>
+            </form>
+            {% else %}
+            <div class="bg-yellow-50 border border-yellow-200 rounded-md p-4">
+                <div class="flex">
+                    <div class="flex-shrink-0">
+                        <svg class="h-5 w-5 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                        </svg>
+                    </div>
+                    <div class="ml-3">
+                        <p class="text-sm text-yellow-700">
+                            No clinician profile found for this user. The clinician may need to complete their profile setup.
+                        </p>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
         </div>
         {% endif %}
 

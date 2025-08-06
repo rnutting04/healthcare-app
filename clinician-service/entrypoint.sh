@@ -1,21 +1,18 @@
-#!/bin/sh
+#!/bin/bash
 
-echo "Waiting for postgres..."
+# Exit on error
+set -e
 
-while ! nc -z postgres 5432; do
-  sleep 0.1
-done
+echo "Starting Clinician Service..."
 
-echo "PostgreSQL started"
-
-# Wait a bit to ensure auth-service has run its migrations first
-echo "Waiting for auth-service to initialize..."
-sleep 10
-
-# Run migrations
-echo "Running clinician service migrations..."
+# Run migrations (no-op since we use in-memory SQLite)
+echo "Running migrations..."
 python manage.py migrate --noinput || true
 
-# Start the server
-echo "Starting server..."
+# Collect static files
+echo "Collecting static files..."
+python manage.py collectstatic --noinput || true
+
+# Start the application
+echo "Starting Gunicorn..."
 exec "$@"

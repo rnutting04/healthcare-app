@@ -7,13 +7,13 @@ from django.conf import settings
 from django.db.models import Q
 from django.utils import timezone
 from datetime import datetime, timedelta
-from .models import User, Role, Patient, EventLog, CancerType, UserEncryptionKey, FileMetadata, FileAccessLog, RAGDocument, RefreshToken, Language, RAGEmbedding, RAGEmbeddingJob
+from .models import User, Role, Patient, Clinician, EventLog, CancerType, UserEncryptionKey, FileMetadata, FileAccessLog, RAGDocument, RefreshToken, Language, RAGEmbedding, RAGEmbeddingJob, PatientAssignment
 from .serializers import (
-    UserSerializer, PatientSerializer,
+    UserSerializer, PatientSerializer, ClinicianSerializer,
     EventLogSerializer, CancerTypeSerializer,
     FileMetadataSerializer, RAGDocumentSerializer, LanguageSerializer,
     RAGEmbeddingSerializer, RAGEmbeddingJobSerializer, EmbeddingCreateSerializer,
-    BulkEmbeddingCreateSerializer, EmbeddingSearchSerializer
+    BulkEmbeddingCreateSerializer, EmbeddingSearchSerializer, PatientAssignmentSerializer
 )
 
 
@@ -174,25 +174,77 @@ class PatientViewSet(viewsets.ModelViewSet):
         except Patient.DoesNotExist:
             return Response({'error': 'Patient not found'}, status=status.HTTP_404_NOT_FOUND)
 
-# class ClinicianViewSet(viewsets.ModelViewSet):
-#     queryset = Clinician.objects.select_related('user').all()
-#     serializer_class = ClinicianSerializer
-#     
-#     @action(detail=False, methods=['get'])
-#     def available(self, request):
-#         clinicians = self.queryset.filter(is_available=True)
-#         serializer = self.get_serializer(clinicians, many=True)
-#         return Response(serializer.data)
-#     
-#     @action(detail=False, methods=['get'])
-#     def by_specialization(self, request):
-#         specialization = request.query_params.get('specialization')
-#         if not specialization:
-#             return Response({'error': 'specialization parameter required'}, status=status.HTTP_400_BAD_REQUEST)
-#         
-#         clinicians = self.queryset.filter(specialization__icontains=specialization)
-#         serializer = self.get_serializer(clinicians, many=True)
-#         return Response(serializer.data)
+class ClinicianViewSet(viewsets.ModelViewSet):
+    queryset = Clinician.objects.select_related('user', 'specialization').all()
+    serializer_class = ClinicianSerializer
+    
+    def create(self, request, *args, **kwargs):
+        """Create a new clinician profile"""
+        user_id = request.data.get('user_id')
+        specialization_id = request.data.get('specialization_id')
+        phone_number = request.data.get('phone_number', '')
+        
+        if not user_id:
+            return Response(
+                {'error': 'user_id is required'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            # Get user
+            user = User.objects.get(id=user_id)
+            
+            # Get specialization if provided
+            specialization = None
+            if specialization_id:
+                specialization = CancerType.objects.get(id=specialization_id, parent__isnull=True)
+            
+            # Create clinician
+            clinician = Clinician.objects.create(
+                user=user,
+                specialization=specialization,
+                phone_number=phone_number,
+                is_available=True
+            )
+            
+            serializer = self.get_serializer(clinician)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+            
+        except User.DoesNotExist:
+            return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
+        except CancerType.DoesNotExist:
+            return Response({'error': 'Invalid specialization'}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+    
+    @action(detail=False, methods=['get'])
+    def by_user(self, request):
+        user_id = request.query_params.get('user_id')
+        if not user_id:
+            return Response({'error': 'user_id parameter required'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            clinician = Clinician.objects.select_related('user', 'specialization').get(user__id=user_id)
+            serializer = self.get_serializer(clinician)
+            return Response(serializer.data)
+        except Clinician.DoesNotExist:
+            return Response({'error': 'Clinician not found'}, status=status.HTTP_404_NOT_FOUND)
+    
+    @action(detail=False, methods=['get'])
+    def available(self, request):
+        clinicians = self.queryset.filter(is_available=True)
+        serializer = self.get_serializer(clinicians, many=True)
+        return Response(serializer.data)
+    
+    @action(detail=False, methods=['get'])
+    def by_specialization(self, request):
+        specialization_id = request.query_params.get('specialization_id')
+        if not specialization_id:
+            return Response({'error': 'specialization_id parameter required'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        clinicians = self.queryset.filter(specialization__id=specialization_id)
+        serializer = self.get_serializer(clinicians, many=True)
+        return Response(serializer.data)
 
 @api_view(['POST'])
 def log_event(request):
@@ -918,3 +970,59 @@ def check_document_embeddings(request, document_id):
     """Check if document has embeddings"""
     has_embeddings = RAGEmbedding.objects.filter(document_id=document_id).exists()
     return Response({'has_embeddings': has_embeddings})
+
+
+class PatientAssignmentViewSet(viewsets.ModelViewSet):
+    queryset = PatientAssignment.objects.select_related('patient', 'cancer_subtype', 'assigned_clinician', 'updated_by').all()
+    serializer_class = PatientAssignmentSerializer
+    
+    @action(detail=False, methods=['get'])
+    def by_patient(self, request):
+        """Get assignment by patient ID"""
+        patient_id = request.query_params.get('patient_id')
+        if not patient_id:
+            return Response({'error': 'patient_id parameter required'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            assignment = PatientAssignment.objects.select_related(
+                'patient', 'cancer_subtype', 'assigned_clinician', 'updated_by'
+            ).get(patient_id=patient_id)
+            serializer = self.get_serializer(assignment)
+            return Response(serializer.data)
+        except PatientAssignment.DoesNotExist:
+            return Response({'error': 'Assignment not found'}, status=status.HTTP_404_NOT_FOUND)
+    
+    def create(self, request, *args, **kwargs):
+        """Create or update patient assignment"""
+        patient_id = request.data.get('patient')
+        if not patient_id:
+            return Response({'error': 'patient is required'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Check if assignment already exists
+        try:
+            assignment = PatientAssignment.objects.get(patient_id=patient_id)
+            # Update existing assignment
+            serializer = self.get_serializer(assignment, data=request.data, partial=True)
+        except PatientAssignment.DoesNotExist:
+            # Create new assignment
+            serializer = self.get_serializer(data=request.data)
+        
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+    def update(self, request, *args, **kwargs):
+        """Update patient assignment"""
+        partial = kwargs.pop('partial', False)
+        instance = self.get_object()
+        
+        # Set updated_by to the requesting user (if available)
+        if 'updated_by' not in request.data and hasattr(request, 'user'):
+            request.data['updated_by'] = request.user.id
+        
+        serializer = self.get_serializer(instance, data=request.data, partial=partial)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+        
+        return Response(serializer.data)

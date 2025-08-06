@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import User, Role, Patient, EventLog, CancerType, FileMetadata, RAGDocument, Language, RAGEmbedding, RAGEmbeddingJob
+from .models import User, Role, Patient, Clinician, EventLog, CancerType, FileMetadata, RAGDocument, Language, RAGEmbedding, RAGEmbeddingJob, PatientAssignment
 
 class LanguageSerializer(serializers.ModelSerializer):
     class Meta:
@@ -40,13 +40,23 @@ class PatientSerializer(serializers.ModelSerializer):
         fields = '__all__'
         read_only_fields = ['created_at', 'updated_at']
 
-# class ClinicianSerializer(serializers.ModelSerializer):
-#     user = UserSerializer(read_only=True)
-#     
-#     class Meta:
-#         model = Clinician
-#         fields = '__all__'
-#         read_only_fields = ['created_at', 'updated_at']
+class ClinicianSerializer(serializers.ModelSerializer):
+    user = UserSerializer(read_only=True)
+    specialization_detail = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = Clinician
+        fields = '__all__'
+        read_only_fields = ['created_at', 'updated_at']
+    
+    def get_specialization_detail(self, obj):
+        if obj.specialization:
+            return {
+                'id': obj.specialization.id,
+                'cancer_type': obj.specialization.cancer_type,
+                'description': obj.specialization.description
+            }
+        return None
 
 class CancerTypeSerializer(serializers.ModelSerializer):
     subtypes = serializers.SerializerMethodField()
@@ -142,3 +152,41 @@ class EmbeddingSearchSerializer(serializers.Serializer):
     )
     cancer_type_id = serializers.IntegerField(required=False, allow_null=True)
     k = serializers.IntegerField(default=5, min_value=1, max_value=50)
+
+
+class PatientAssignmentSerializer(serializers.ModelSerializer):
+    cancer_subtype_detail = serializers.SerializerMethodField()
+    assigned_clinician_detail = serializers.SerializerMethodField()
+    updated_by_detail = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = PatientAssignment
+        fields = '__all__'
+        read_only_fields = ['created_at', 'updated_at']
+    
+    def get_cancer_subtype_detail(self, obj):
+        if obj.cancer_subtype:
+            return {
+                'id': obj.cancer_subtype.id,
+                'cancer_type': obj.cancer_subtype.cancer_type,
+                'parent': obj.cancer_subtype.parent.cancer_type if obj.cancer_subtype.parent else None
+            }
+        return None
+    
+    def get_assigned_clinician_detail(self, obj):
+        if obj.assigned_clinician:
+            return {
+                'id': obj.assigned_clinician.id,
+                'name': f"Dr. {obj.assigned_clinician.user.first_name} {obj.assigned_clinician.user.last_name}",
+                'specialization': obj.assigned_clinician.specialization.cancer_type if obj.assigned_clinician.specialization else None
+            }
+        return None
+    
+    def get_updated_by_detail(self, obj):
+        if obj.updated_by:
+            return {
+                'id': obj.updated_by.id,
+                'name': f"{obj.updated_by.first_name} {obj.updated_by.last_name}",
+                'email': obj.updated_by.email
+            }
+        return None
