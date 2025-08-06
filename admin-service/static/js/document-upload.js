@@ -292,9 +292,14 @@ document.addEventListener('DOMContentLoaded', function() {
                 setTimeout(() => {
                     uploadProgressModal.classList.add('hidden');
                     showSuccess(successMessage);
-                    // Update the documents list after hiding modal
-                    updateRecentUploads();
-                    // Start monitoring embedding status
+                    
+                    // Only reload documents if we're on page 1, otherwise just monitor the new uploads
+                    if (currentPage === 1) {
+                        // Update the documents list after hiding modal
+                        updateRecentUploads();
+                    }
+                    
+                    // Start monitoring embedding status for newly uploaded files only
                     if (data.uploaded_files) {
                         data.uploaded_files.forEach(file => {
                             if (file.embedding_job_id) {
@@ -539,8 +544,8 @@ document.addEventListener('DOMContentLoaded', function() {
             
             tableBody.appendChild(row);
             
-            // Immediately check embedding status for this document
-            (async () => {
+            // Check embedding status for this document with a small delay to avoid race conditions
+            setTimeout(async () => {
                 try {
                     const response = await fetch(`/admin/api/embedding-status/${doc.file}/`, {
                         headers: {
@@ -556,7 +561,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 } catch (error) {
                     console.error(`Error checking embedding status for ${doc.file}:`, error);
                 }
-            })();
+            }, 100);
             
             // Create mobile card
             const mobileCard = document.createElement('div');
@@ -875,8 +880,18 @@ document.addEventListener('DOMContentLoaded', function() {
     // WebSocket connections for embedding status
     const embeddingWebSockets = new Map();
     
+    // Track which documents are actively being processed to avoid duplicate updates
+    const activelyProcessingDocs = new Set();
+    
     // Function to monitor embedding status
     function monitorEmbeddingStatus(documentId) {
+        // Skip if already monitoring this document
+        if (activelyProcessingDocs.has(documentId)) {
+            return;
+        }
+        
+        activelyProcessingDocs.add(documentId);
+        
         // First check if there's a job ID from the recent upload
         const checkInitialStatus = async () => {
             try {
@@ -902,6 +917,9 @@ document.addEventListener('DOMContentLoaded', function() {
                             // Fall back to polling
                             setTimeout(() => checkInitialStatus(), 5000);
                         }
+                    } else {
+                        // Not processing anymore, remove from tracking
+                        activelyProcessingDocs.delete(documentId);
                     }
                 }
             } catch (error) {
@@ -931,6 +949,12 @@ document.addEventListener('DOMContentLoaded', function() {
         socket.onmessage = (event) => {
             const data = JSON.parse(event.data);
             
+            // Ensure we're updating the correct document
+            if (data.job_id !== jobId) {
+                console.warn(`Received update for wrong job: ${data.job_id} vs ${jobId}`);
+                return;
+            }
+            
             if (data.type === 'progress_update') {
                 updateEmbeddingStatusDisplay(documentId, {
                     status: data.status,
@@ -941,6 +965,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 // When job completes, fetch the actual embedding status to get chunk count
                 socket.close();
                 embeddingWebSockets.delete(jobId);
+                activelyProcessingDocs.delete(documentId);
                 
                 // Small delay to ensure embeddings are saved in database
                 setTimeout(() => {
@@ -972,6 +997,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 });
                 socket.close();
                 embeddingWebSockets.delete(jobId);
+                activelyProcessingDocs.delete(documentId);
             }
         };
         
@@ -981,6 +1007,7 @@ document.addEventListener('DOMContentLoaded', function() {
         
         socket.onclose = () => {
             embeddingWebSockets.delete(jobId);
+            activelyProcessingDocs.delete(documentId);
         };
     }
     
@@ -992,10 +1019,14 @@ document.addEventListener('DOMContentLoaded', function() {
         
         
         if (!desktopElement && !mobileElement) {
-            console.error(`Could not find any elements for document: ${documentId}`);
+            // Document might not be visible in current page
             return;
         }
         
+        // Don't update if this is a stale update (document already completed)
+        if (desktopElement && desktopElement.querySelector('.bg-green-100') && statusData.status === 'processing') {
+            return;
+        }
         
         let statusHtml = '';
         const progress = statusData.progress || {};
@@ -1080,7 +1111,8 @@ document.addEventListener('DOMContentLoaded', function() {
         statusElements.forEach(async element => {
             const documentId = element.getAttribute('data-document-id');
             
-            if (documentId && !checkedDocuments.has(documentId)) {
+            // Skip if already being monitored or already checked
+            if (documentId && !checkedDocuments.has(documentId) && !activelyProcessingDocs.has(documentId)) {
                 checkedDocuments.add(documentId);
                 // First check status to see if we need to monitor
                 try {

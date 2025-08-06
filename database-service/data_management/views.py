@@ -1,7 +1,8 @@
-from rest_framework import viewsets, status
+from rest_framework import viewsets, status, filters
 from rest_framework.decorators import action, api_view
 from rest_framework.response import Response
 from rest_framework.pagination import PageNumberPagination
+from django_filters.rest_framework import DjangoFilterBackend
 from django.core.cache import cache
 from django.conf import settings
 from django.db.models import Q
@@ -893,6 +894,10 @@ class RAGEmbeddingViewSet(viewsets.ModelViewSet):
 class RAGEmbeddingJobViewSet(viewsets.ModelViewSet):
     queryset = RAGEmbeddingJob.objects.all()
     serializer_class = RAGEmbeddingJobSerializer
+    filter_backends = [DjangoFilterBackend, filters.OrderingFilter]
+    filterset_fields = ['document', 'status', 'id']
+    ordering_fields = ['created_at', 'updated_at']
+    ordering = ['-created_at']
     
     @action(detail=False, methods=['post'])
     def create_status(self, request):
