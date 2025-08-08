@@ -146,6 +146,7 @@ CLINICIAN_SERVICE_URL = config('CLINICIAN_SERVICE_URL', default='http://clinicia
 FILE_SERVICE_URL = config('FILE_SERVICE_URL', default='http://file-service:8006')
 AUTH_SERVICE_URL = config('AUTH_SERVICE_URL', default='http://auth-service:8001')
 RAG_EMBEDDING_SERVICE_URL = config('RAG_EMBEDDING_SERVICE_URL', default='http://rag-embedding-service:8007')
+OCR_SERVICE_URL = config('OCR_SERVICE_URL', default='http://ocr-service:8008')
 
 # JWT Configuration
 # Use same fallback as auth-service

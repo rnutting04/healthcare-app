@@ -124,6 +124,9 @@ services:
       - AUTH_SERVICE_URL=http://auth-service:8001
       - PATIENT_SERVICE_URL=http://patient-service:8002
       - CLINICIAN_SERVICE_URL=http://clinician-service:8003
+      - FILE_SERVICE_URL=http://file-service:8006
+      - RAG_EMBEDDING_SERVICE_URL=http://rag-embedding-service:8007
+      - OCR_SERVICE_URL=http://ocr-service:8008
       - SECRET_KEY=${SECRET_KEY:-your-secret-key-here}
       - DEBUG=${DEBUG:-True}
       - ALLOWED_HOSTS=${ALLOWED_HOSTS:-*}
@@ -186,6 +189,44 @@ services:
       - ./rag-embedding-service:/app
       - rag-temp-files:/app/media/temp_files
 
+  ocr-service:
+    build:
+      context: ./ocr-service
+      dockerfile: Dockerfile
+    ports:
+      - "8008:8008"
+    environment:
+      - DATABASE_SERVICE_URL=http://database-service:8004
+      - FILE_SERVICE_URL=http://file-service:8006
+      - REDIS_URL=redis://redis:6379
+      - DATABASE_SERVICE_TOKEN=${DATABASE_SERVICE_TOKEN:-db-service-secret-token}
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-your-secret-key-here}
+      - SECRET_KEY=${SECRET_KEY:-your-secret-key-here}
+      - DEBUG=${DEBUG:-True}
+      - ALLOWED_HOSTS=${ALLOWED_HOSTS:-*}
+      - OCR_REDIS_DB=${OCR_REDIS_DB:-2}
+      - OCR_MAX_FILE_SIZE_MB=${OCR_MAX_FILE_SIZE_MB:-50}
+      - OCR_ALLOWED_EXTENSIONS=${OCR_ALLOWED_EXTENSIONS:-.txt,.rtf,.pdf,.jpg,.jpeg,.png,.bmp,.tiff}
+      - OCR_GPU_THRESHOLD=${OCR_GPU_THRESHOLD:-0.5}
+      - OCR_MODEL_GPU=${OCR_MODEL_GPU:-microsoft/trocr-large-printed}
+      - OCR_MODEL_CPU=${OCR_MODEL_CPU:-microsoft/trocr-base-printed}
+      - OCR_MAX_CONCURRENT_JOBS=${OCR_MAX_CONCURRENT_JOBS:-3}
+      - OCR_JOB_TIMEOUT=${OCR_JOB_TIMEOUT:-300}
+      - OCR_CLEANUP_DELAY=${OCR_CLEANUP_DELAY:-60}
+    depends_on:
+      - database-service
+      - redis
+    volumes:
+      - ./ocr-service:/app
+      - ocr-temp-files:/app/media/temp_files
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
   nginx:
     build:
       context: ./nginx
@@ -200,6 +241,7 @@ services:
       - admin-service
       - file-service
       - rag-embedding-service
+      - ocr-service
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - clinician-media:/media
@@ -230,3 +272,4 @@ volumes:
   file-storage:
   rag-temp-files:
   clinician-media:
+  ocr-temp-files:

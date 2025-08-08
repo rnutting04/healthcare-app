@@ -187,6 +187,7 @@ class DatabaseService:
             'database-service': settings.DATABASE_SERVICE_URL,
             'file-service': settings.FILE_SERVICE_URL,
             'rag-embedding-service': settings.RAG_EMBEDDING_SERVICE_URL,
+            'ocr-service': settings.OCR_SERVICE_URL,
             'admin-service': 'http://admin-service:8005'  # Self check
         }
         
