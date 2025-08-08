@@ -7,7 +7,7 @@ from fastapi import Request, HTTPException, status
 AUTH_SERVICE_URL = os.environ.get("AUTH_SERVICE_URL")
 
 #hardcoded secret for service-to-service communication
-SERVICE_TOKEN_SECRET = "db-service-secret-token"
+SERVICE_TOKEN_SECRET = os.environ.get("TRANSLATION_SERVICE_TOKEN")
 
 #FastAPI dependency that replicates the authentication logic from the
 #healthcare-app's Django JWTAuthenticationMiddleware

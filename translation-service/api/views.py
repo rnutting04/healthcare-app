@@ -3,7 +3,7 @@ import json
 import logging
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 
-from api.serializers import TranslationRequest, JobResponse, TranslationResponse, Result
+from api.serializers import TranslationRequest, JobResponse, Result
 from services.translation import get_translation_cache_key, RESULTS_CACHE_PREFIX, REQUEST_QUEUE_KEY
 from auth import verify_token
 from db import redis_client
@@ -23,7 +23,7 @@ async def health_check():
 #defines the endpoint for submitting a new translation job
 @router.post(
     '/translate', 
-    response_model=JobResponse | TranslationResponse,
+    response_model=JobResponse,
     status_code=status.HTTP_202_ACCEPTED,
     tags=['Translation'],
     dependencies=[Depends(verify_token)]
@@ -39,11 +39,14 @@ async def submit_translation(translation_request: TranslationRequest, response: 
     #attempt to get the result from the Redis cache
     cached_result = redis_client.get(final_cache_key)
     if cached_result:
-        logger.info(f"Cache hit for key: {final_cache_key}")
+        truncated_key = final_cache_key.split(':')[-1][:12]
+        logger.info(f"Cache hit for key ending in: ...{truncated_key}")
+
         response.status_code = status.HTTP_200_OK
-        return TranslationResponse(
-            message="Translation retrived from cache.",
-            result=cached_result
+        return Result(
+            status="completed",
+            result=cached_result,
+            from_cache=True
         )
 
     # --- Queue New Job ---

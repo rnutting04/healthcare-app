@@ -189,6 +189,7 @@ services:
       - REDIS_PORT=6379
       - AUTH_SERVICE_URL=http://auth-service:8001
       - JWT_SECRET_KEY=${JWT_SECRET_KEY:-your-secret-key-here}
+      - TRANSLATION_SERVICE_TOKEN=${TRANSLATION_SERVICE_TOKEN}
     depends_on:
       - redis
       - auth-service

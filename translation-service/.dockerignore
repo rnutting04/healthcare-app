@@ -7,7 +7,6 @@ __pycache__/
 .venv/
 venv/
 
-# Docker and VS Code
 .dockerignore
 .vscode/
 

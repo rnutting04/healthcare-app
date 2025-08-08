@@ -5,10 +5,8 @@ from threading import Thread
 sys.path.append('.')
 
 from services.translation import translation_worker, get_translation_pipeline
-from translation_service.config import LANGUAGE_CODES
+from translation_service.config import LANGUAGE_CODES, NUM_WORKER_THREADS
 from db import redis_client
-
-NUM_WORKER_THREADS = 3
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)

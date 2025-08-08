@@ -34,6 +34,7 @@ TRANSLATION_CACHE_PREFIX = "translation_cache:"
 BATCH_SIZE = 8
 #number of seconds the worker will wait for a new job before checking again
 BATCH_TIMEOUT = 1.0
+NUM_WORKER_THREADS = 3
 
 # --- Auth Configuration ---
 #URL for the central auth service, which must be provided by an environment variable
