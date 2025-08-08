@@ -115,6 +115,15 @@ class DatabaseService:
             logger.error(f"Failed to get clinician patients: {e}")
             return []
     
+    @staticmethod
+    def get_patient(patient_id: int) -> Optional[Dict[str, Any]]:
+        """Get patient by ID"""
+        try:
+            return DatabaseService.make_request('GET', f'/api/patients/{patient_id}/')
+        except Exception as e:
+            logger.error(f"Failed to get patient: {e}")
+            return None
+    
     # Appointment operations for clinician dashboard
     @staticmethod
     def get_clinician_appointments(clinician_id: int, params: Optional[Dict] = None) -> List[Dict[str, Any]]:
@@ -186,3 +195,21 @@ class DatabaseService:
             DatabaseService.make_request('POST', '/api/refresh-tokens/invalidate_user/', data={'user_id': user_id})
         except Exception as e:
             logger.error(f"Failed to invalidate user tokens: {e}")
+    
+    @staticmethod
+    def get_medical_record_types() -> List[Dict[str, Any]]:
+        """Get available medical record types"""
+        try:
+            return DatabaseService.make_request('GET', '/api/medical-record-types/')
+        except Exception as e:
+            logger.error(f"Failed to get medical record types: {e}")
+            return []
+    
+    @staticmethod
+    def get_patient_medical_records(patient_id: int) -> List[Dict[str, Any]]:
+        """Get all medical records for a patient"""
+        try:
+            return DatabaseService.make_request('GET', '/api/medical-records/', params={'patient': patient_id})
+        except Exception as e:
+            logger.error(f"Failed to get patient medical records: {e}")
+            return []

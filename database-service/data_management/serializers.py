@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import User, Role, Patient, Clinician, EventLog, CancerType, FileMetadata, RAGDocument, Language, RAGEmbedding, RAGEmbeddingJob, PatientAssignment
+from .models import User, Role, Patient, Clinician, EventLog, CancerType, FileMetadata, RAGDocument, Language, RAGEmbedding, RAGEmbeddingJob, PatientAssignment, MedicalRecordType, MedicalRecord, MedicalRecordAccess
 
 class LanguageSerializer(serializers.ModelSerializer):
     class Meta:
@@ -34,11 +34,31 @@ class PatientSerializer(serializers.ModelSerializer):
     address = serializers.CharField(allow_blank=True, required=False)
     emergency_contact_name = serializers.CharField(allow_blank=True, required=False)
     emergency_contact_phone = serializers.CharField(allow_blank=True, required=False)
+    user = UserSerializer(read_only=True)
+    assignment = serializers.SerializerMethodField()
     
     class Meta:
         model = Patient
         fields = '__all__'
         read_only_fields = ['created_at', 'updated_at']
+    
+    def get_assignment(self, obj):
+        """Get patient assignment details if available"""
+        try:
+            if hasattr(obj, 'assignment'):
+                assignment = obj.assignment
+                return {
+                    'id': assignment.id,
+                    'cancer_subtype': assignment.cancer_subtype.id if assignment.cancer_subtype else None,
+                    'cancer_subtype_name': assignment.cancer_subtype.cancer_type if assignment.cancer_subtype else None,
+                    'assigned_clinician': assignment.assigned_clinician.id if assignment.assigned_clinician else None,
+                    'notes': assignment.notes,
+                    'created_at': assignment.created_at.isoformat() if assignment.created_at else None,
+                    'updated_at': assignment.updated_at.isoformat() if assignment.updated_at else None
+                }
+        except:
+            pass
+        return None
 
 class ClinicianSerializer(serializers.ModelSerializer):
     user = UserSerializer(read_only=True)
@@ -190,3 +210,51 @@ class PatientAssignmentSerializer(serializers.ModelSerializer):
                 'email': obj.updated_by.email
             }
         return None
+
+
+class MedicalRecordTypeSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = MedicalRecordType
+        fields = ['id', 'type_name', 'is_active', 'created_at']
+        read_only_fields = ['created_at']
+
+
+class MedicalRecordSerializer(serializers.ModelSerializer):
+    file_detail = FileMetadataSerializer(source='file', read_only=True)
+    patient_detail = serializers.SerializerMethodField()
+    medical_record_type_detail = MedicalRecordTypeSerializer(source='medical_record_type', read_only=True)
+    uploaded_by_detail = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = MedicalRecord
+        fields = ['file', 'patient', 'medical_record_type', 'uploaded_by', 'created_at', 
+                  'file_detail', 'patient_detail', 'medical_record_type_detail', 'uploaded_by_detail']
+        read_only_fields = ['created_at', 'file_detail', 'patient_detail', 'medical_record_type_detail', 'uploaded_by_detail']
+    
+    def get_patient_detail(self, obj):
+        """Get basic patient info"""
+        return {
+            'id': obj.patient.id,
+            'name': f"{obj.patient.user.first_name} {obj.patient.user.last_name}" if hasattr(obj.patient, 'user') else 'Unknown'
+        }
+    
+    def get_uploaded_by_detail(self, obj):
+        """Get uploader info"""
+        if obj.uploaded_by:
+            return {
+                'id': obj.uploaded_by.id,
+                'name': f"{obj.uploaded_by.first_name} {obj.uploaded_by.last_name}",
+                'email': obj.uploaded_by.email
+            }
+        return None
+
+
+class MedicalRecordAccessSerializer(serializers.ModelSerializer):
+    user_detail = UserSerializer(source='user', read_only=True)
+    granted_by_detail = UserSerializer(source='granted_by', read_only=True)
+    
+    class Meta:
+        model = MedicalRecordAccess
+        fields = ['id', 'medical_record', 'user', 'encrypted_access_key', 'granted_by', 'granted_at', 
+                  'expires_at', 'revoked_at', 'is_active', 'user_detail', 'granted_by_detail']
+        read_only_fields = ['granted_at', 'is_active', 'user_detail', 'granted_by_detail']

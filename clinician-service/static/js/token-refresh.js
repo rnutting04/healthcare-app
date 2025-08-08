@@ -55,6 +55,42 @@ async function refreshAccessToken() {
     }
 }
 
+// Check if user is active and refresh if needed
+async function refreshIfActive() {
+    const accessToken = getAccessToken();
+    if (!accessToken) {
+        return false;
+    }
+
+    try {
+        const response = await fetch('/api/clinician/auth/refresh-if-active/', {
+            method: 'POST',
+            credentials: 'include', // Include cookies
+            headers: {
+                'Authorization': `Bearer ${accessToken}`,
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        });
+        
+        const data = await response.json();
+        
+        if (data.active) {
+            if (data.needs_refresh && data.access) {
+                setTokens(data.access);
+            }
+            return true;
+        } else {
+            clearTokens();
+            window.location.href = '/login/';
+            return false;
+        }
+    } catch (error) {
+        console.error('Activity check failed:', error);
+        return false;
+    }
+}
+
 // Set up automatic token refresh
 let refreshInterval;
 
@@ -66,7 +102,7 @@ function startTokenRefresh() {
     
     // Set up new interval
     refreshInterval = setInterval(() => {
-        refreshAccessToken();
+        refreshIfActive();
     }, TOKEN_REFRESH_INTERVAL);
 }
 
@@ -87,5 +123,6 @@ window.tokenUtils = {
     setTokens,
     clearTokens,
     refreshAccessToken,
+    refreshIfActive,
     startTokenRefresh
 };

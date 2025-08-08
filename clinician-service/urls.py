@@ -7,6 +7,8 @@ from rest_framework import permissions
 from drf_yasg.views import get_schema_view
 from drf_yasg import openapi
 from django.views.generic import RedirectView
+from django.conf import settings
+from django.conf.urls.static import static
 
 schema_view = get_schema_view(
     openapi.Info(
@@ -40,3 +42,9 @@ urlpatterns = [
     # Redirect root to dashboard
     path('', RedirectView.as_view(url='/clinician/dashboard/', permanent=False)),
 ]
+
+# Serve static and media files in development
+if settings.DEBUG:
+    urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
+    # Media files are served by nginx, not Django
+    # urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

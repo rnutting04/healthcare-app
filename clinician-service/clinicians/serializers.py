@@ -86,3 +86,31 @@ class ClinicianDashboardSerializer(serializers.Serializer):
     # Lists (will be empty for stub implementation)
     upcoming_appointments = serializers.ListField(child=serializers.DictField(), default=list)
     recent_patients = serializers.ListField(child=serializers.DictField(), default=list)
+
+
+class PatientListSerializer(serializers.Serializer):
+    """Serializer for patient list data"""
+    id = serializers.IntegerField(read_only=True)
+    user = UserSerializer(read_only=True, required=False)
+    phone_number = serializers.CharField(max_length=20, allow_blank=True, required=False)
+    address = serializers.CharField(allow_blank=True, required=False)
+    emergency_contact_name = serializers.CharField(max_length=255, allow_blank=True, required=False)
+    emergency_contact_phone = serializers.CharField(max_length=20, allow_blank=True, required=False)
+    date_of_birth = serializers.DateField(required=False)
+    gender = serializers.CharField(max_length=10, required=False)
+    created_at = serializers.DateTimeField(read_only=True)
+    
+    # Patient assignment details
+    assignment = serializers.SerializerMethodField()
+    
+    def get_assignment(self, obj):
+        """Get patient assignment details if available"""
+        if isinstance(obj, dict) and 'assignment' in obj:
+            assignment = obj['assignment']
+            return {
+                'cancer_subtype': assignment.get('cancer_subtype'),
+                'cancer_subtype_name': assignment.get('cancer_subtype_name'),
+                'notes': assignment.get('notes'),
+                'assigned_at': assignment.get('created_at')
+            }
+        return None

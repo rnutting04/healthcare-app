@@ -95,7 +95,7 @@ USE_I18N = True
 USE_TZ = True
 
 # Static files (CSS, JavaScript, Images)
-STATIC_URL = '/static/'
+STATIC_URL = '/clinician/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 
 # Additional directories to collect static files from
@@ -117,9 +117,13 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # Service URLs
 AUTH_SERVICE_URL = config('AUTH_SERVICE_URL', default='http://auth-service:8001')
 DATABASE_SERVICE_URL = config('DATABASE_SERVICE_URL', default='http://database-service:8004')
+FILE_SERVICE_URL = config('FILE_SERVICE_URL', default='http://file-service:8006')
 
 # Service authentication token
 DATABASE_SERVICE_TOKEN = config('DATABASE_SERVICE_TOKEN', default='db-service-secret-token')
+
+# Redis configuration
+REDIS_URL = config('REDIS_URL', default='redis://redis:6379')
 
 # JWT Settings
 JWT_SECRET_KEY = config('JWT_SECRET_KEY', default=SECRET_KEY)
@@ -142,7 +146,7 @@ CORS_ALLOW_CREDENTIALS = True
 # Security settings
 SECURE_BROWSER_XSS_FILTER = True
 SECURE_CONTENT_TYPE_NOSNIFF = True
-X_FRAME_OPTIONS = 'DENY'
+X_FRAME_OPTIONS = 'SAMEORIGIN'
 
 if not DEBUG:
     SECURE_SSL_REDIRECT = True

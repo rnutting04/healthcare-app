@@ -8,13 +8,14 @@ from django.conf import settings
 from django.db.models import Q
 from django.utils import timezone
 from datetime import datetime, timedelta
-from .models import User, Role, Patient, Clinician, EventLog, CancerType, UserEncryptionKey, FileMetadata, FileAccessLog, RAGDocument, RefreshToken, Language, RAGEmbedding, RAGEmbeddingJob, PatientAssignment
+from .models import User, Role, Patient, Clinician, EventLog, CancerType, UserEncryptionKey, FileMetadata, FileAccessLog, RAGDocument, RefreshToken, Language, RAGEmbedding, RAGEmbeddingJob, PatientAssignment, MedicalRecordType, MedicalRecord, MedicalRecordAccess
 from .serializers import (
     UserSerializer, PatientSerializer, ClinicianSerializer,
     EventLogSerializer, CancerTypeSerializer,
     FileMetadataSerializer, RAGDocumentSerializer, LanguageSerializer,
     RAGEmbeddingSerializer, RAGEmbeddingJobSerializer, EmbeddingCreateSerializer,
-    BulkEmbeddingCreateSerializer, EmbeddingSearchSerializer, PatientAssignmentSerializer
+    BulkEmbeddingCreateSerializer, EmbeddingSearchSerializer, PatientAssignmentSerializer,
+    MedicalRecordTypeSerializer, MedicalRecordSerializer, MedicalRecordAccessSerializer
 )
 
 
@@ -174,6 +175,35 @@ class PatientViewSet(viewsets.ModelViewSet):
             return Response(serializer.data)
         except Patient.DoesNotExist:
             return Response({'error': 'Patient not found'}, status=status.HTTP_404_NOT_FOUND)
+    
+    @action(detail=False, methods=['get'])
+    def by_clinician(self, request):
+        """Get all patients assigned to a specific clinician"""
+        clinician_id = request.query_params.get('clinician_id')
+        if not clinician_id:
+            return Response({'error': 'clinician_id parameter required'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            # Get patients through PatientAssignment
+            patients = Patient.objects.filter(
+                assignment__assigned_clinician_id=clinician_id
+            ).select_related('preferred_language', 'assignment', 'assignment__cancer_subtype')
+            
+            # Get user data for each patient
+            patient_data = []
+            for patient in patients:
+                patient_dict = self.get_serializer(patient).data
+                # Fetch user data separately
+                try:
+                    user = User.objects.get(id=patient.user_id)
+                    patient_dict['user'] = UserSerializer(user).data
+                except User.DoesNotExist:
+                    patient_dict['user'] = None
+                patient_data.append(patient_dict)
+            
+            return Response(patient_data)
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 class ClinicianViewSet(viewsets.ModelViewSet):
     queryset = Clinician.objects.select_related('user', 'specialization').all()
@@ -1031,3 +1061,142 @@ class PatientAssignmentViewSet(viewsets.ModelViewSet):
         self.perform_update(serializer)
         
         return Response(serializer.data)
+    
+    @action(detail=False, methods=['get'])
+    def check_assignment(self, request):
+        """Check if a clinician is assigned to a patient"""
+        patient_id = request.query_params.get('patient_id')
+        clinician_user_id = request.query_params.get('clinician_user_id')
+        
+        if not patient_id or not clinician_user_id:
+            return Response({'error': 'patient_id and clinician_user_id are required'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            # Get clinician by user ID
+            clinician = Clinician.objects.get(user_id=clinician_user_id)
+            
+            # Check if patient is assigned to this clinician
+            assignment_exists = PatientAssignment.objects.filter(
+                patient_id=patient_id,
+                assigned_clinician=clinician
+            ).exists()
+            
+            return Response({
+                'is_assigned': assignment_exists,
+                'patient_id': patient_id,
+                'clinician_id': clinician.id,
+                'clinician_user_id': clinician_user_id
+            })
+        except Clinician.DoesNotExist:
+            return Response({
+                'is_assigned': False,
+                'error': 'Clinician not found'
+            })
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class MedicalRecordTypeViewSet(viewsets.ReadOnlyModelViewSet):
+    """
+    ViewSet for medical record types (read-only since these are predefined)
+    """
+    queryset = MedicalRecordType.objects.filter(is_active=True).order_by('type_name')
+    serializer_class = MedicalRecordTypeSerializer
+    
+    def list(self, request):
+        """List all active medical record types"""
+        types = self.get_queryset()
+        serializer = self.get_serializer(types, many=True)
+        return Response(serializer.data)
+
+
+class MedicalRecordViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet for medical records
+    """
+    queryset = MedicalRecord.objects.all()
+    serializer_class = MedicalRecordSerializer
+    filter_backends = [DjangoFilterBackend, filters.OrderingFilter]
+    filterset_fields = ['patient', 'medical_record_type']
+    ordering_fields = ['file__uploaded_at']
+    ordering = ['-file__uploaded_at']
+    
+    def get_queryset(self):
+        """Filter medical records by patient if specified"""
+        queryset = super().get_queryset()
+        patient_id = self.request.query_params.get('patient_id')
+        if patient_id:
+            queryset = queryset.filter(patient_id=patient_id)
+        return queryset.select_related('file', 'patient', 'medical_record_type')
+    
+    def create(self, request):
+        """Create a new medical record"""
+        serializer = self.get_serializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+    @action(detail=False, methods=['get'])
+    def by_patient(self, request):
+        """Get all medical records for a specific patient"""
+        patient_id = request.query_params.get('patient_id')
+        if not patient_id:
+            return Response({'error': 'patient_id is required'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        records = self.get_queryset().filter(patient_id=patient_id)
+        serializer = self.get_serializer(records, many=True)
+        return Response(serializer.data)
+
+
+class MedicalRecordAccessViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet for managing medical record access permissions
+    """
+    queryset = MedicalRecordAccess.objects.all()
+    serializer_class = MedicalRecordAccessSerializer
+    
+    def get_queryset(self):
+        """Filter access records"""
+        queryset = super().get_queryset()
+        
+        # Filter by medical record
+        medical_record_id = self.request.query_params.get('medical_record_id')
+        if medical_record_id:
+            queryset = queryset.filter(medical_record_id=medical_record_id)
+        
+        # Filter by user
+        user_id = self.request.query_params.get('user_id')
+        if user_id:
+            queryset = queryset.filter(user_id=user_id)
+        
+        # Filter only active access
+        if self.request.query_params.get('active_only', 'true').lower() == 'true':
+            queryset = queryset.filter(revoked_at__isnull=True)
+            # Also check expiry
+            now = timezone.now()
+            queryset = queryset.filter(
+                Q(expires_at__isnull=True) | Q(expires_at__gt=now)
+            )
+        
+        return queryset.select_related('medical_record', 'user', 'granted_by')
+    
+    def create(self, request):
+        """Grant access to a medical record"""
+        serializer = self.get_serializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+    @action(detail=True, methods=['post'])
+    def revoke(self, request, pk=None):
+        """Revoke access to a medical record"""
+        access = self.get_object()
+        access.revoked_at = timezone.now()
+        access.save()
+        
+        return Response({
+            'message': 'Access revoked successfully',
+            'revoked_at': access.revoked_at
+        })

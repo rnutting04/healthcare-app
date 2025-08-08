@@ -135,6 +135,23 @@ class CancerType(models.Model):
             return f"{self.parent.cancer_type} - {self.cancer_type}"
         return self.cancer_type
 
+class MedicalRecordType(models.Model):
+    """
+    Predefined types of medical records that don't change.
+    """
+    id = models.BigAutoField(primary_key=True)
+    type_name = models.CharField(max_length=50, unique=True)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        db_table = 'medical_record_types'
+        ordering = ['type_name']
+    
+    def __str__(self):
+        return self.type_name
+
+
 class EventLog(models.Model):
     event_type = models.CharField(max_length=100)
     service = models.CharField(max_length=50)
@@ -284,6 +301,69 @@ class RefreshToken(models.Model):
     
     def __str__(self):
         return f"Token for {self.user.email}"
+
+
+class MedicalRecord(models.Model):
+    """
+    Medical records linking files to patients with record types.
+    Uses composite primary key of file, patient, and record type.
+    """
+    file = models.OneToOneField(FileMetadata, on_delete=models.CASCADE, primary_key=True, related_name='medical_record')
+    patient = models.ForeignKey(Patient, on_delete=models.CASCADE, related_name='medical_records')
+    medical_record_type = models.ForeignKey(MedicalRecordType, on_delete=models.PROTECT, related_name='medical_records')
+    uploaded_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='uploaded_medical_records')
+    # Store the encryption key encrypted with a master key (for emergency access)
+    record_encryption_key = models.TextField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        db_table = 'medical_records'
+        unique_together = [['file', 'patient', 'medical_record_type']]
+        indexes = [
+            models.Index(fields=['patient']),
+            models.Index(fields=['medical_record_type']),
+            models.Index(fields=['-created_at']),
+        ]
+    
+    def __str__(self):
+        return f"Medical Record: {self.file.filename} - Patient {self.patient.id} - {self.medical_record_type.type_name}"
+
+
+class MedicalRecordAccess(models.Model):
+    """
+    Grants access to medical records for specific users.
+    The record's encryption key is encrypted with each user's personal key.
+    """
+    medical_record = models.ForeignKey(MedicalRecord, on_delete=models.CASCADE, related_name='access_grants')
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='medical_record_access')
+    # The medical record's encryption key, encrypted with this user's personal key
+    encrypted_access_key = models.TextField()
+    granted_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='access_granted_by')
+    granted_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField(null=True, blank=True)
+    revoked_at = models.DateTimeField(null=True, blank=True)
+    
+    class Meta:
+        db_table = 'medical_record_access'
+        unique_together = [['medical_record', 'user']]
+        indexes = [
+            models.Index(fields=['user', '-granted_at']),
+            models.Index(fields=['medical_record', 'user']),
+        ]
+    
+    def __str__(self):
+        return f"{self.user.email} access to {self.medical_record}"
+    
+    @property
+    def is_active(self):
+        """Check if access is currently active"""
+        from django.utils import timezone
+        now = timezone.now()
+        if self.revoked_at and self.revoked_at <= now:
+            return False
+        if self.expires_at and self.expires_at <= now:
+            return False
+        return True
 
 
 # RAG Embedding models

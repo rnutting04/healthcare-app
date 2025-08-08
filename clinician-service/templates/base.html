@@ -1,0 +1,75 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Healthcare System - Clinician Portal{% endblock %}</title>
+    <link rel="icon" type="image/x-icon" href="{% static 'img/favicon.ico' %}">
+    <link href="{% static 'css/main.css' %}" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    {% block extra_head %}{% endblock %}
+</head>
+<body class="bg-gray-50 min-h-screen flex flex-col">
+    <!-- Navigation -->
+    <nav class="bg-white shadow-sm">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16">
+                <div class="flex">
+                    <div class="flex-shrink-0 flex items-center">
+                        <h1 class="text-xl font-bold text-blue-600">Healthcare System</h1>
+                    </div>
+                    <div class="hidden sm:ml-6 sm:flex sm:space-x-8">
+                        {% block navigation %}
+                        <a href="/clinician/dashboard/" class="{% block nav_dashboard %}border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700{% endblock %} inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
+                            Dashboard
+                        </a>
+                        <a href="#" id="patients-link" class="{% block nav_patients %}border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700{% endblock %} inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
+                            Patients
+                        </a>
+                        <a href="#" class="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
+                            Appointments <span class="ml-1 text-xs text-gray-400">(Coming Soon)</span>
+                        </a>
+                        <a href="#" class="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
+                            Medical Records <span class="ml-1 text-xs text-gray-400">(Coming Soon)</span>
+                        </a>
+                        {% endblock %}
+                    </div>
+                </div>
+                <div class="hidden sm:ml-6 sm:flex sm:items-center">
+                    <div class="ml-3 relative">
+                        <div class="flex items-center">
+                            <span class="text-sm text-gray-700 mr-4">Dr. {{ user.first_name }} {{ user.last_name }}</span>
+                            <form action="/logout" method="POST" class="inline">
+                                {% csrf_token %}
+                                <button type="submit" class="bg-red-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-red-700">
+                                    Logout
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="flex-grow">
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-gray-800 text-white mt-auto">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+            <div class="text-center text-sm text-gray-300">
+                &copy; 2025 Healthcare System. All rights reserved.
+            </div>
+        </div>
+    </footer>
+
+    <!-- Base Scripts -->
+    <script src="{% static 'js/token-refresh.js' %}"></script>
+    {% block extra_scripts %}{% endblock %}
+</body>
+</html>

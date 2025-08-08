@@ -76,6 +76,8 @@ services:
     environment:
       - DATABASE_SERVICE_URL=http://database-service:8004
       - AUTH_SERVICE_URL=http://auth-service:8001
+      - FILE_SERVICE_URL=http://file-service:8006
+      - REDIS_URL=redis://redis:6379
       - SECRET_KEY=${SECRET_KEY:-your-secret-key-here}
       - DEBUG=${DEBUG:-True}
       - ALLOWED_HOSTS=${ALLOWED_HOSTS:-*}
@@ -83,8 +85,10 @@ services:
     depends_on:
       - database-service
       - auth-service
+      - redis
     volumes:
       - ./clinician-service:/app
+      - clinician-media:/app/media
 
 
   database-service:
@@ -198,6 +202,7 @@ services:
       - rag-embedding-service
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - clinician-media:/media
       - patient-static:/patient-static
       - auth-static:/auth-static
       - admin-static:/admin-static
@@ -224,3 +229,4 @@ volumes:
   admin-static:
   file-storage:
   rag-temp-files:
+  clinician-media:
