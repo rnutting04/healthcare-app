@@ -118,8 +118,20 @@ class OCRProcessor:
     def _process_pdf_file(self, file_path: str, job_id: str) -> Dict:
         """Process PDF files"""
         try:
-            # Convert PDF to images
-            images = pdf2image.convert_from_path(file_path)
+            # Get DPI and format settings from Django settings
+            from django.conf import settings
+            DPI = getattr(settings, 'OCR_PDF_DPI', 400)
+            FORMAT = getattr(settings, 'OCR_PDF_FORMAT', 'PNG')
+            
+            logger.info(f"Converting PDF with DPI={DPI}, format={FORMAT}")
+            
+            # Convert PDF to images with configured settings
+            images = pdf2image.convert_from_path(
+                file_path,
+                dpi=DPI,
+                fmt=FORMAT,
+                thread_count=4  # Use multiple threads for faster conversion
+            )
             
             pages = []
             all_text = []

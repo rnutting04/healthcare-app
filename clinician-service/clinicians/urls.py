@@ -4,7 +4,7 @@ from .views import (
     ClinicianAuthViewSet, ClinicianProfileView, ClinicianDashboardView, 
     ClinicianPatientsView, PatientDetailView, PatientDashboardView,
     MedicalRecordDownloadView, MedicalRecordDeleteView, MedicalRecordViewView,
-    TempFileCleanupView
+    TempFileCleanupView, MedicalRecordAIAnalysisView, OCRResultView
 )
 
 router = DefaultRouter()
@@ -22,5 +22,7 @@ urlpatterns = [
     path('files/medical-records/<str:file_id>/download/', MedicalRecordDownloadView.as_view(), name='medical-record-download'),
     path('files/medical-records/<str:file_id>/delete/', MedicalRecordDeleteView.as_view(), name='medical-record-delete'),
     path('files/medical-records/<str:file_id>/view/', MedicalRecordViewView.as_view(), name='medical-record-view'),
+    path('files/medical-records/<str:file_id>/analyze/', MedicalRecordAIAnalysisView.as_view(), name='medical-record-analyze'),
     path('files/temp/cleanup/', TempFileCleanupView.as_view(), name='temp-file-cleanup'),
+    path('clinician/ocr/job/<str:job_id>/result/', OCRResultView.as_view(), name='ocr-result'),
 ]

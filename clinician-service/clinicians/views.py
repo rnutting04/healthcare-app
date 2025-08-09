@@ -895,3 +895,235 @@ class TempFileCleanupView(APIView):
                 {'error': 'Failed to delete temporary file'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+
+
+class MedicalRecordAIAnalysisView(APIView):
+    """View for analyzing medical records using OCR service"""
+    
+    def post(self, request, file_id):
+        """Submit medical record for AI/OCR analysis"""
+        import tempfile
+        import os
+        import logging
+        
+        logger = logging.getLogger(__name__)
+        
+        # ===== TESTING ONLY - REMOVE IN PRODUCTION =====
+        logger.info(f"=== Starting AI Analysis for file {file_id} ===")
+        # ===== END TESTING =====
+        
+        try:
+            # Get JWT token for authentication
+            auth_header = request.META.get('HTTP_AUTHORIZATION', '')
+            if not auth_header:
+                logger.error("No authorization header")
+                return Response(
+                    {'error': 'Authentication required'},
+                    status=status.HTTP_401_UNAUTHORIZED
+                )
+            
+            # Step 1: Get decrypted file from file-service
+            # ===== TESTING ONLY - REMOVE IN PRODUCTION =====
+            logger.info(f"Step 1: Requesting decrypted file from file-service for file_id: {file_id}")
+            # ===== END TESTING =====
+            
+            headers = {'Authorization': auth_header}
+            
+            # Request decrypted file from file-service
+            file_response = requests.get(
+                f"{settings.FILE_SERVICE_URL}/api/files/medical-records/{file_id}/download",
+                headers=headers,
+                stream=True
+            )
+            
+            if file_response.status_code != 200:
+                logger.error(f"Failed to get file from file-service: {file_response.status_code}")
+                return Response(
+                    {'error': 'Failed to retrieve medical record'},
+                    status=file_response.status_code
+                )
+            
+            # Extract filename from Content-Disposition header
+            content_disposition = file_response.headers.get('Content-Disposition', '')
+            filename = 'medical_record.pdf'
+            if 'filename=' in content_disposition:
+                filename = content_disposition.split('filename=')[-1].strip('"')
+            
+            # ===== TESTING ONLY - REMOVE IN PRODUCTION =====
+            logger.info(f"Retrieved file: {filename}, size: {len(file_response.content)} bytes")
+            # ===== END TESTING =====
+            
+            # Step 2: Save decrypted file temporarily
+            temp_file_path = None
+            try:
+                # Create temp file with proper extension
+                file_ext = os.path.splitext(filename)[1] or '.pdf'
+                with tempfile.NamedTemporaryFile(suffix=file_ext, delete=False) as temp_file:
+                    temp_file.write(file_response.content)
+                    temp_file_path = temp_file.name
+                    # ===== TESTING ONLY - REMOVE IN PRODUCTION =====
+                    logger.info(f"Saved temporary file: {temp_file_path}")
+                    # ===== END TESTING =====
+                
+                # Step 3: Submit to OCR service
+                # ===== TESTING ONLY - REMOVE IN PRODUCTION =====
+                logger.info("Step 3: Submitting file to OCR service")
+                # ===== END TESTING =====
+                
+                with open(temp_file_path, 'rb') as f:
+                    files = {'file': (filename, f, 'application/pdf')}
+                    
+                    ocr_response = requests.post(
+                        f"{settings.OCR_SERVICE_URL}/api/ocr/submit/",
+                        files=files,
+                        headers={'Authorization': auth_header}
+                    )
+                
+                if ocr_response.status_code not in [200, 202]:
+                    logger.error(f"OCR submission failed: {ocr_response.status_code} - {ocr_response.text}")
+                    return Response(
+                        {'error': 'Failed to submit for OCR processing'},
+                        status=ocr_response.status_code
+                    )
+                
+                ocr_data = ocr_response.json()
+                job_id = ocr_data.get('job_id')
+                
+                # ===== TESTING ONLY - REMOVE IN PRODUCTION =====
+                logger.info(f"OCR job submitted successfully. Job ID: {job_id}")
+                logger.info(f"OCR Response: {json.dumps(ocr_data, indent=2)}")
+                # ===== END TESTING =====
+                
+                # Step 4: Store job info in Redis for tracking
+                r = redis.from_url(settings.REDIS_URL, decode_responses=True)
+                job_info = {
+                    'job_id': job_id,
+                    'file_id': file_id,
+                    'filename': filename,
+                    'status': 'submitted',
+                    'created_at': datetime.now().isoformat(),
+                    'websocket_url': ocr_data.get('websocket_url')
+                }
+                
+                # Store with expiry of 1 hour
+                r.setex(
+                    f"ocr_job:{job_id}",
+                    3600,
+                    json.dumps(job_info)
+                )
+                
+                # ===== TESTING ONLY - REMOVE IN PRODUCTION =====
+                logger.info(f"=== AI Analysis initiated successfully for {filename} ===")
+                # ===== END TESTING =====
+                
+                # Return job info to frontend
+                return Response({
+                    'success': True,
+                    'job_id': job_id,
+                    'filename': filename,
+                    'websocket_url': ocr_data.get('websocket_url'),
+                    'ocr_service_url': settings.OCR_SERVICE_URL,
+                    'message': 'File submitted for OCR processing'
+                })
+                
+            finally:
+                # Clean up temp file
+                if temp_file_path and os.path.exists(temp_file_path):
+                    os.remove(temp_file_path)
+                    # ===== TESTING ONLY - REMOVE IN PRODUCTION =====
+                    logger.info(f"Cleaned up temporary file: {temp_file_path}")
+                    # ===== END TESTING =====
+                    
+        except Exception as e:
+            logger.error(f"Failed to process AI analysis: {e}", exc_info=True)
+            return Response(
+                {'error': f'Failed to process AI analysis: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+
+class OCRResultView(APIView):
+    """View for retrieving OCR results"""
+    
+    def get(self, request, job_id):
+        """Get OCR job result"""
+        import logging
+        
+        logger = logging.getLogger(__name__)
+        
+        try:
+            # Get JWT token for authentication
+            auth_header = request.META.get('HTTP_AUTHORIZATION', '')
+            if not auth_header:
+                return Response(
+                    {'error': 'Authentication required'},
+                    status=status.HTTP_401_UNAUTHORIZED
+                )
+            
+            # Get OCR result from OCR service
+            # ===== TESTING ONLY - REMOVE IN PRODUCTION =====
+            logger.info(f"Fetching OCR result for job {job_id}")
+            # ===== END TESTING =====
+            
+            headers = {'Authorization': auth_header}
+            response = requests.get(
+                f"{settings.OCR_SERVICE_URL}/api/ocr/job/{job_id}/result/",
+                headers=headers
+            )
+            
+            if response.status_code != 200:
+                logger.error(f"Failed to get OCR result: {response.status_code}")
+                return Response(
+                    response.json() if response.content else {'error': 'Failed to get OCR result'},
+                    status=response.status_code
+                )
+            
+            result_data = response.json()
+            
+            # ===== TESTING ONLY - REMOVE IN PRODUCTION =====
+            # Log the extracted text for debugging
+            logger.info("=== OCR EXTRACTION COMPLETE ===")
+            logger.info(f"Job ID: {job_id}")
+            logger.info(f"File: {result_data.get('file_name')}")
+            logger.info(f"Confidence: {result_data.get('confidence_score')}%")
+            logger.info(f"Pages: {result_data.get('page_count')}")
+            logger.info(f"Processing Time: {result_data.get('processing_time')}s")
+            logger.info(f"Model Used: {result_data.get('model_used')}")
+            logger.info(f"GPU Used: {result_data.get('gpu_used')}")
+            logger.info("=== EXTRACTED TEXT ===")
+            logger.info(result_data.get('extracted_text', 'No text extracted'))
+            logger.info("=== END OF EXTRACTED TEXT ===")
+            # ===== END TESTING =====
+            
+            # ===== TESTING ONLY - REMOVE IN PRODUCTION =====
+            # Save to file for review
+            try:
+                output_file = f"/mnt/c/Users/georg/Documents/healthcare-app/ocr_output_{job_id}.txt"
+                with open(output_file, 'w', encoding='utf-8') as f:
+                    f.write(f"OCR Analysis Results\n")
+                    f.write(f"{'='*50}\n")
+                    f.write(f"Job ID: {job_id}\n")
+                    f.write(f"File: {result_data.get('file_name')}\n")
+                    f.write(f"Confidence Score: {result_data.get('confidence_score')}%\n")
+                    f.write(f"Page Count: {result_data.get('page_count')}\n")
+                    f.write(f"Processing Time: {result_data.get('processing_time')}s\n")
+                    f.write(f"Model Used: {result_data.get('model_used')}\n")
+                    f.write(f"GPU Used: {result_data.get('gpu_used')}\n")
+                    f.write(f"{'='*50}\n\n")
+                    f.write("EXTRACTED TEXT:\n")
+                    f.write(f"{'='*50}\n")
+                    f.write(result_data.get('extracted_text', 'No text extracted'))
+                    f.write(f"\n{'='*50}\n")
+                logger.info(f"OCR output saved to: {output_file}")
+            except Exception as e:
+                logger.error(f"Failed to save OCR output to file: {e}")
+            # ===== END TESTING =====
+            
+            return Response(result_data)
+            
+        except Exception as e:
+            logger.error(f"Failed to get OCR result: {e}")
+            return Response(
+                {'error': 'Failed to retrieve OCR result'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )

@@ -118,6 +118,7 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 AUTH_SERVICE_URL = config('AUTH_SERVICE_URL', default='http://auth-service:8001')
 DATABASE_SERVICE_URL = config('DATABASE_SERVICE_URL', default='http://database-service:8004')
 FILE_SERVICE_URL = config('FILE_SERVICE_URL', default='http://file-service:8006')
+OCR_SERVICE_URL = config('OCR_SERVICE_URL', default='http://ocr-service:8008')
 
 # Service authentication token
 DATABASE_SERVICE_TOKEN = config('DATABASE_SERVICE_TOKEN', default='db-service-secret-token')

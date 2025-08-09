@@ -129,6 +129,8 @@ OCR_MODEL_CPU = os.getenv('OCR_MODEL_CPU', 'microsoft/trocr-base-printed')
 OCR_MAX_CONCURRENT_JOBS = int(os.getenv('OCR_MAX_CONCURRENT_JOBS', '3'))
 OCR_JOB_TIMEOUT = int(os.getenv('OCR_JOB_TIMEOUT', '300'))  # 5 minutes
 OCR_CLEANUP_DELAY = int(os.getenv('OCR_CLEANUP_DELAY', '60'))  # 1 minute after completion
+OCR_PDF_DPI = int(os.getenv('OCR_PDF_DPI', '400'))
+OCR_PDF_FORMAT = os.getenv('OCR_PDF_FORMAT', 'PNG')
 
 # File storage
 TEMP_FILE_PATH = os.path.join(BASE_DIR, 'media', 'temp_files')
