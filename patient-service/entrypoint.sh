@@ -15,6 +15,10 @@ sleep 10
 # No migrations needed for patient service as it doesn't have local models
 echo "Patient service ready (no migrations needed)"
 
+# Collect static files
+echo "Collecting static files..."
+python manage.py collectstatic --noinput
+
 # Start the server
 echo "Starting server..."
 exec "$@"
