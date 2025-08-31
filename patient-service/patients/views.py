@@ -497,13 +497,11 @@ class ChatViewSet(viewsets.ViewSet):
         if not user_message:
             return Response({"error": "Message is required"}, status=400)
 
-        # Patient + language
         patient = self.get_patient(request)
         if not patient:
             return Response({"error": "Patient not found"}, status=404)
         preferred_language = (patient.get("preferred_language") or "English").strip()
 
-        # Resolve or create chat session
         if session_id:
             session = DatabaseService.get_chat_session_by_id_and_patient(session_id, patient["id"])
             logger.info(f"Loaded session {session_id} for patient {patient['id']} {session}")
@@ -515,20 +513,17 @@ class ChatViewSet(viewsets.ViewSet):
                 session = DatabaseService.create_chat_session(patient["id"])
                 initialAssitantMessage = "Hello! I'm your medical assistant. I can help answer questions about your condition based on medical documents. How can I help you today?"
                 DatabaseService.create_chat_message(session["id"], "assistant",initialAssitantMessage)
-        # Load prior messages and build chat_history (include language/system guidance)
+                
         messages = DatabaseService.get_messages_for_session(session["id"])
         chat_history = [{"role": "system", "content": (
             "You are a helpful assistant for a patient dashboard following NCCN guidelines. "
             f"Reply in {preferred_language}."
         )}]
         for msg in messages:
-            # assuming msg has attributes .role and .content (as in your original code)
             chat_history.append({"role": msg.role, "content": msg.content})
 
-        # Include the new user message in both history and DB
         chat_history.append({"role": "user", "content": user_message})
 
-        # Keep your existing rough token guard; if huge, start a fresh session
         try:
             rough_token_count = sum(len(m["content"]) for m in chat_history) // 4
             if rough_token_count > getattr(settings, "OPENAI_MAX_TOKENS_PER_CHUNK", 8000):
@@ -585,7 +580,6 @@ class ChatViewSet(viewsets.ViewSet):
         # Persist assistant reply
         DatabaseService.create_chat_message(session["id"], "assistant", reply)
 
-        # Title (keep behavior but without external LLM; simple fallback)
         try:
             if not session.get("title") or session["title"].strip() == "New Chat":
                 generated_title = (user_message[:25] or "Conversation").strip()
