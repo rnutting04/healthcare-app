@@ -8,14 +8,15 @@ from django.conf import settings
 from django.db.models import Q
 from django.utils import timezone
 from datetime import datetime, timedelta
-from .models import User, Role, Patient, Clinician, EventLog, CancerType, UserEncryptionKey, FileMetadata, FileAccessLog, RAGDocument, RefreshToken, Language, RAGEmbedding, RAGEmbeddingJob, PatientAssignment, MedicalRecordType, MedicalRecord, MedicalRecordAccess
+from .models import User, Role, Patient, Clinician, EventLog, CancerType, UserEncryptionKey, FileMetadata, FileAccessLog, RAGDocument, RefreshToken, Language, RAGEmbedding, RAGEmbeddingJob, PatientAssignment, MedicalRecordType, MedicalRecord, MedicalRecordAccess, ChatMessage, ChatSession
 from .serializers import (
     UserSerializer, PatientSerializer, ClinicianSerializer,
     EventLogSerializer, CancerTypeSerializer,
     FileMetadataSerializer, RAGDocumentSerializer, LanguageSerializer,
     RAGEmbeddingSerializer, RAGEmbeddingJobSerializer, EmbeddingCreateSerializer,
     BulkEmbeddingCreateSerializer, EmbeddingSearchSerializer, PatientAssignmentSerializer,
-    MedicalRecordTypeSerializer, MedicalRecordSerializer, MedicalRecordAccessSerializer
+    MedicalRecordTypeSerializer, MedicalRecordSerializer, MedicalRecordAccessSerializer,
+    ChatMessageSerializer, ChatSessionSerializer
 )
 
 
@@ -1200,3 +1201,90 @@ class MedicalRecordAccessViewSet(viewsets.ModelViewSet):
             'message': 'Access revoked successfully',
             'revoked_at': access.revoked_at
         })
+    
+
+class ChatViewSet(viewsets.ViewSet):
+
+    @action(detail=False, methods=['get'])
+    def sessions(self, request):
+        patient_id = request.query_params.get('patient_id')
+        if not patient_id:
+            return Response({'error': 'patient_id is required'}, status=status.HTTP_400_BAD_REQUEST)
+        sessions = ChatSession.objects.filter(patient_id=patient_id).order_by('-created_at')
+        return Response(ChatSessionSerializer(sessions, many=True).data)
+
+    @action(detail=False, methods=['post'])
+    def start(self, request):
+        patient_id = request.data.get('patient_id')
+        if not patient_id:
+            return Response({'error': 'patient_id is required'}, status=status.HTTP_400_BAD_REQUEST)
+        session = ChatSession.objects.create(patient_id=patient_id, title="New Chat")
+        return Response(ChatSessionSerializer(session).data)
+
+    @action(detail=False, methods=['get'])
+    def load(self, request):
+        session_id = request.query_params.get('session_id')
+        patient_id = request.query_params.get('patient_id')
+        if not session_id or not patient_id:
+            return Response({'error': 'session_id and patient_id are required'}, status=400)
+        session = ChatSession.objects.filter(id=session_id, patient_id=patient_id).first()
+        if not session:
+            return Response({'error': 'Session not found'}, status=404)
+        return Response(ChatSessionSerializer(session).data)
+
+    @action(detail=False, methods=['get'])
+    def messages(self, request):
+        session_id = request.query_params.get('session_id')
+        if not session_id:
+            return Response({'error': 'session_id is required'}, status=400)
+        messages = ChatMessage.objects.filter(session_id=session_id).order_by('timestamp')
+        return Response(ChatMessageSerializer(messages, many=True).data)
+
+    @action(detail=False, methods=['post'])
+    def message(self, request):
+        session_id = request.data.get('session_id')
+        role = request.data.get('role')
+        content = request.data.get('content')
+
+        if not session_id or not role or not content:
+            return Response({'error': 'session_id, role, and content are required'}, status=400)
+
+        msg = ChatMessage.objects.create(session_id=session_id, role=role, content=content)
+        return Response(ChatMessageSerializer(msg).data)
+
+    @action(detail=False, methods=['post'])
+    def rename_session(self, request):
+        session_id = request.data.get('session_id')
+        title = request.data.get('title')
+
+        if not session_id or not title:
+            return Response({'error': 'session_id and title required'}, status=400)
+
+        session = ChatSession.objects.filter(id=session_id).first()
+        session.title = title
+        session.save(update_fields=['title'])
+        return Response({'success': True})
+
+    @action(detail=True, methods=['delete'])
+    def delete(self, request, pk=None):
+        patient_id = request.query_params.get('patient_id')
+        session = ChatSession.objects.filter(id=pk, patient_id=patient_id).first()
+        if session:
+            session.delete()
+            return Response({'message': 'Session deleted.'})
+        return Response({'error': 'Session not found or delete failed.'}, status=400)
+
+    @action(detail=False, methods=['post'])
+    def suggestions(self, request):
+        session_id = request.data.get('session_id')
+        suggestions = request.data.get('suggestions')
+        if not session_id or not suggestions:
+            return Response({'error': 'Session ID or suggestions not provided.'}, status=400)
+        
+        session = ChatSession.objects.filter(id=session_id).first()
+        if not session:
+            return Response({'error': 'Session not found.'}, status=404)
+        
+        session.suggestions = suggestions
+        session.save(update_fields=['suggestions'])
+        return Response({'success': True})

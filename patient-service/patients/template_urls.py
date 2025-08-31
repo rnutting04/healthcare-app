@@ -7,4 +7,5 @@ urlpatterns = [
     path('patient/appointments/', template_views.patient_appointments, name='patient_appointments'),
     path('patient/records/', template_views.patient_records, name='patient_records'),
     path('patient/prescriptions/', template_views.patient_prescriptions, name='patient_prescriptions'),
+    path('patient/chat/', template_views.patient_chat, name='patient_chat')
 ]

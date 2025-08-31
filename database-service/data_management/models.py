@@ -419,3 +419,31 @@ class RAGEmbeddingJob(models.Model):
     
     def __str__(self):
         return f"Job {self.id} - {self.status}"
+    
+class ChatSession(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    patient = models.ForeignKey(Patient, on_delete=models.CASCADE)
+    title = models.CharField(max_length=100, default="New Chat")
+    created_at = models.DateTimeField(auto_now_add=True)
+    suggestions = models.JSONField(default=list, blank=True)
+
+    class Meta:
+        db_table = 'chat_sessions'
+        ordering = ['-created_at']  # Newest first
+    
+    def __str__(self):
+        return f"Chat Session {self.id}"
+
+class ChatMessage(models.Model):
+    id = models.BigAutoField(primary_key=True)
+    session = models.ForeignKey(ChatSession, on_delete=models.CASCADE, related_name="messages")
+    role = models.CharField(max_length=10, choices=[("user", "User"), ("assistant", "Assistant")])
+    content = models.TextField()
+    timestamp = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'chat_messages'
+        ordering = ['timestamp']  # Oldest first
+        
+    def __str__(self):
+        return f"Chat Message {self.id}"

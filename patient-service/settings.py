@@ -137,8 +137,10 @@ DATABASE_SERVICE_TOKEN = config('DATABASE_SERVICE_TOKEN', default='db-service-se
 # JWT Settings
 JWT_SECRET_KEY = config('JWT_SECRET_KEY', default=SECRET_KEY)
 JWT_ALGORITHM = config('JWT_ALGORITHM', default='HS256')
-
+OPENAI_MAX_TOKENS_PER_CHUNK = config('OPENAI_MAX_TOKENS_PER_CHUNK', default=3000)
+OPENAI_API_KEY = config('OPENAI_API_KEY', default='xxxx')
 # REST Framework settings
+
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [],
     'DEFAULT_PERMISSION_CLASSES': [],  # JWT middleware handles authentication

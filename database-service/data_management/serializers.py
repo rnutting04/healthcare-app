@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import User, Role, Patient, Clinician, EventLog, CancerType, FileMetadata, RAGDocument, Language, RAGEmbedding, RAGEmbeddingJob, PatientAssignment, MedicalRecordType, MedicalRecord, MedicalRecordAccess
+from .models import User, Role, Patient, Clinician, EventLog, CancerType, FileMetadata, RAGDocument, Language, RAGEmbedding, RAGEmbeddingJob, PatientAssignment, MedicalRecordType, MedicalRecord, MedicalRecordAccess, ChatMessage, ChatSession
 
 class LanguageSerializer(serializers.ModelSerializer):
     class Meta:
@@ -258,3 +258,15 @@ class MedicalRecordAccessSerializer(serializers.ModelSerializer):
         fields = ['id', 'medical_record', 'user', 'encrypted_access_key', 'granted_by', 'granted_at', 
                   'expires_at', 'revoked_at', 'is_active', 'user_detail', 'granted_by_detail']
         read_only_fields = ['granted_at', 'is_active', 'user_detail', 'granted_by_detail']
+
+class ChatMessageSerializer(serializers.ModelSerializer):
+    class Meta:
+        model  = ChatMessage
+        fields = ["id", "session_id", "role", "content", "timestamp"]
+
+class ChatSessionSerializer(serializers.ModelSerializer):
+    messages = ChatMessageSerializer(many=True, read_only=True)
+
+    class Meta:
+        model  = ChatSession
+        fields = ["id","patient_id", "title", "created_at", "messages", "suggestions"]
