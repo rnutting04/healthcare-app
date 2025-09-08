@@ -13,3 +13,5 @@ requests
 openai
 sentence-transformers
 scikit-learn
+asgiref
+channels_redis

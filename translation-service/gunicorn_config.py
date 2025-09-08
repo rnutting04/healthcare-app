@@ -1,7 +1,3 @@
-import logging
-from services.translation import get_translation_pipeline
-from translation_service.config import LANGUAGE_CODES
-
 # --- Gunicorn Settings ---
 bind = "0.0.0.0:8008"
 workers = 3

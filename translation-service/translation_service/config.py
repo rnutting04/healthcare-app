@@ -10,14 +10,8 @@ torch.set_num_threads(1)
 # --- Model and Language Configuration ---
 #template for constructing the names of the machine learning models
 HELSINKI_NAME_TEMPLATE = "Helsinki-NLP/opus-mt-en-{lang_code}"
-#mapping of full language names to the two-letter codes required by the models
-LANGUAGE_CODES = {
-    "french": "fr",
-    "spanish": "es",
-    "chinese": "zh",
-    "hindi": "hi",
-    "arabic": "ar"
-}
+#set of supported language codes
+LANGUAGE_CODES = {"fr", "es", "zh", "hi", "ar"}
 
 # --- Redis Configuration ---
 REDIS_HOST = os.environ.get('REDIS_HOST', 'redis')

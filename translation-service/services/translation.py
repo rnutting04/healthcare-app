@@ -1,9 +1,13 @@
+import os
 import json
 import time
 import hashlib
 import logging
+import uuid
 from threading import Lock
 from transformers import pipeline
+from asgiref.sync import async_to_sync
+from channels_redis.core import RedisChannelLayer
 
 from translation_service.config import (
     LANGUAGE_CODES, HELSINKI_NAME_TEMPLATE, BATCH_SIZE, BATCH_TIMEOUT,
@@ -12,11 +16,48 @@ from translation_service.config import (
 
 logger = logging.getLogger(__name__)
 
+# --- Manual Channel Layer Configuration ---
+REDIS_HOST = os.getenv('REDIS_HOST', 'redis')
+REDIS_PORT = int(os.getenv('REDIS_PORT', '6379'))
+REDIS_DB = int(os.getenv('TRANSLATION_REDIS_DB', '3'))
+
+channel_layer = RedisChannelLayer(hosts=[f"redis://{REDIS_HOST}:{REDIS_PORT}/{REDIS_DB}"])
+
 # --- In-Memory Caching for ML Models ---
 #store the loaded models to avoid reloading them on every request
 model_cache = {}
 #prevent race conditions where two threads might try to load the same model simultaneously
 model_cache_lock = Lock()
+
+def on_translation_complete(request_id, translated_text, status):
+    """
+    This function is called by your translation worker when a job is done.
+    """
+    try:
+        logger.info(f"--- TRANSLATION WORKER: Publishing update for request_id: {request_id} ---")
+        group_name = f"translation_{request_id}"
+        
+        if status == 'completed':
+            message_type = "translation.complete"
+            payload = {
+                "job_id": request_id,
+                "result": translated_text,
+            }
+        else: # e.g., 'failed'
+            message_type = "translation.error"
+            payload = {
+                "job_id": request_id,
+                "message": translated_text, # The error message
+            }
+
+        message = {
+            "type": message_type,
+            **payload
+        }
+        # Send the message to the Redis group
+        async_to_sync(channel_layer.group_send)(group_name, message)
+    except Exception as e:
+        logger.error(f"failed to publish update for request: {e}")
 
 #generates a consistent, unique cache key for a translated text string
 def get_translation_cache_key(text: str, lang: str):
@@ -26,12 +67,11 @@ def get_translation_cache_key(text: str, lang: str):
 
 #loads a specific translation model from Hugging Face
 #if the model is already loaded, it returns the cached instance
-def get_translation_pipeline(target_language: str):
-    lang_code = LANGUAGE_CODES.get(target_language.lower())
-    if not lang_code:
-        return None, f"Language '{target_language}' not supported."
+def get_translation_pipeline(target_lang_code: str):
+    if target_lang_code not in LANGUAGE_CODES:
+        return None, f"Language code: '{target_lang_code}' not supported."
 
-    model_name = HELSINKI_NAME_TEMPLATE.format(lang_code=lang_code)
+    model_name = HELSINKI_NAME_TEMPLATE.format(lang_code=target_lang_code)
     
     #use a lock to ensure thread-safe access to the model_cache dictionary
     with model_cache_lock:
@@ -120,14 +160,25 @@ def translation_worker(redis_client):
             #use a Redis pipeline to execute multiple commands in a single network round-trip for efficiency
             with redis_client.pipeline() as pipe:
                 for job in jobs_to_process:
-                    #if the job was successful, cache the translation
-                    if job.get('status') == 'completed':
-                        final_cache_key = get_translation_cache_key(job['text'], job['lang'])
-                        pipe.set(final_cache_key, job['result'], ex=3600) #cache for 1 hour
-                    
+                    on_translation_complete(
+                        request_id=job['id'], 
+                        translated_text=job['result'], 
+                        status=job['status']
+                    )
+                    cache_key = get_translation_cache_key(job['text'], job['lang'])
+
+                    #create the final payload.
+                    final_payload = json.dumps({
+                        'status': job['status'],
+                        'result': job['result']
+                    })
+
+                    #overwrite the 'in_progress' status with the final result
+                    #set a long expiry (e.g., 1 hour) for the completed translation
+                    pipe.set(cache_key, final_payload, ex=3600)
+
                     #store the final job status and result for user pickup
                     result_key = f"{RESULTS_CACHE_PREFIX}{job['id']}"
-                    final_payload = json.dumps({'status': job['status'], 'result': job['result']})
                     pipe.set(result_key, final_payload, ex=300) # result available for 5 mins
 
                 pipe.execute()

@@ -33,7 +33,7 @@ async def lifespan(app: FastAPI):
 # Create the main FastAPI application instance.
 app = FastAPI(
     title="Translation Microservice",
-    description="An API for high-performance text translation, consistent with the healthcare-app architecture.",
+    description="An API for high-performance text translation",
     version="2.0.0",
     lifespan=lifespan
 )

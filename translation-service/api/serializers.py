@@ -1,4 +1,5 @@
 from pydantic import BaseModel, Field
+from typing import Union
 
 #--- Pydantic models for data validation ---
 #these classes define the expected format for API's input and output
@@ -7,7 +8,7 @@ from pydantic import BaseModel, Field
 #defines the structure for a POST request to /translate
 class TranslationRequest(BaseModel):
     text: str = Field(..., min_length=1, description="The text to be translated")
-    target_language: str = Field(..., min_length=1, description="The full name of the target language")
+    target_language: str = Field(..., min_length=1, description="The code of the target language")
 
 #defines the response when a new translation job is successfully submitted
 class JobResponse(BaseModel):
@@ -19,3 +20,5 @@ class Result(BaseModel):
     status: str
     result: str | None = None #string could be None if it is still proccessing
     from_cache: bool = Field(default=False, description="Indicates if the result was retrieved from the cache.")
+
+JobOrResult = Union[JobResponse, Result]

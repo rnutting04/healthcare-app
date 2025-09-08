@@ -3,7 +3,7 @@ import json
 import logging
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 
-from api.serializers import TranslationRequest, JobResponse, Result
+from api.serializers import TranslationRequest, JobResponse, Result, JobOrResult
 from services.translation import get_translation_cache_key, RESULTS_CACHE_PREFIX, REQUEST_QUEUE_KEY
 from auth import verify_token
 from db import redis_client
@@ -23,8 +23,8 @@ async def health_check():
 #defines the endpoint for submitting a new translation job
 @router.post(
     '/translate', 
-    response_model=JobResponse,
-    status_code=status.HTTP_202_ACCEPTED,
+    response_model=JobOrResult,
+    status_code=status.HTTP_200_OK,
     tags=['Translation'],
     dependencies=[Depends(verify_token)]
 )
@@ -35,42 +35,44 @@ async def submit_translation(translation_request: TranslationRequest, response: 
 
     # --- Cache Check ---
     #generate the unique key for this specific text and language combination.
-    final_cache_key = get_translation_cache_key(translation_request.text, translation_request.target_language)
-    #attempt to get the result from the Redis cache
-    cached_result = redis_client.get(final_cache_key)
-    if cached_result:
-        truncated_key = final_cache_key.split(':')[-1][:12]
-        logger.info(f"Cache hit for key ending in: ...{truncated_key}")
+    cache_key = get_translation_cache_key(translation_request.text, translation_request.target_language)
+    truncated_key = cache_key.split(':')[-1][:12]
+    in_progress_payload = json.dumps({'status': 'in_progress', 'result': None})
 
-        response.status_code = status.HTTP_200_OK
-        return Result(
-            status="completed",
-            result=cached_result,
-            from_cache=True
-        )
+    #atomic operation: attempt to set the key if it does not exist
+    was_set = redis_client.set(cache_key, in_progress_payload, ex=600, nx=True)
 
-    # --- Queue New Job ---
-    logger.info(f"Cache miss for key: {final_cache_key}. Submitting new job.")
-    #generate a new, unique ID for this job request
-    request_id = str(uuid.uuid4())
-    #dictionary containing all the information the worker needs to process the job
-    task = {
-        'id': request_id,
-        'text': translation_request.text,
-        'lang': translation_request.target_language,
-     }
+    # --- Cache Miss and New Job ---
+    if was_set:
+        logger.info(f"Cache miss for key ending in: ...{truncated_key}. Submitting new job.")
+        logger.info("job accepted")
+        #generate a new, unique ID for this job request
+        request_id = str(uuid.uuid4())
 
-    #key where the job's result will be stored.
-    result_key = f"{RESULTS_CACHE_PREFIX}{request_id}"
+        #dictionary containing all the information the worker needs to process the job
+        task = {
+            'id': request_id,
+            'text': translation_request.text,
+            'lang': translation_request.target_language,
+        }
 
-    #set an intial status so user and see their job in the queue
-    initial_payload = json.dumps({'status': 'queued', 'result': None})
-    #store initial status in Redis with TTL of 1 hour
-    redis_client.set(result_key, initial_payload, ex=3600)
+        #push job to the end of the worker queue in Redis
+        redis_client.rpush(REQUEST_QUEUE_KEY, json.dumps(task))
+        response.status_code = status.HTTP_202_ACCEPTED
+        return JobResponse(message="Request accepted.", request_id=request_id)
 
-    #push job to the end of the worker queue in Redis
-    redis_client.rpush(REQUEST_QUEUE_KEY, json.dumps(task))
-    return JobResponse(message="Request accepted.", request_id=request_id)
+    # --- CACHE HIT (Job is in_progress or completed) ---
+    existing_data = redis_client.get(cache_key)
+    data = json.loads(existing_data) # Parse the JSON payload
+    if data.get('status') == 'in_progress':
+        logger.info(f"Job rejected.")
+    else:
+        logger.info(f"Cache hit for completed job for key ending in: ... {truncated_key}")
+    return Result(
+        status=data.get('status'),
+        result=data.get('result'),
+        from_cache=True
+    )
 
 @router.get(
     "/result/{request_id}", 

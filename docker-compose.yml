@@ -52,8 +52,8 @@ services:
     build:
       context: ./patient-service
       dockerfile: Dockerfile
-    ports:
-      - "8002:8002"
+    expose:
+      - "8002"
     environment:
       - DATABASE_SERVICE_URL=http://database-service:8004
       - AUTH_SERVICE_URL=http://auth-service:8001
@@ -179,11 +179,11 @@ services:
 
   translation-service:
     build:
-      context: ./translation-service # Points to your service's folder
+      context: ./translation-service
       dockerfile: Dockerfile
     container_name: translation_app
     ports:
-      - "8008:8008" # Using the consistent port mapping
+      - "8008:8008"
     environment:
       - REDIS_HOST=redis
       - REDIS_PORT=6379
@@ -199,13 +199,12 @@ services:
 
   worker:
     build:
-      context: ./translation-service # Also builds from the same folder
+      context: ./translation-service
       dockerfile: Dockerfile
     container_name: translator_worker
     environment:
       - REDIS_HOST=redis
       - REDIS_PORT=6379
-    # Overwrite the default entrypoint to run the worker script
     entrypoint: python worker.py
     depends_on:
       - redis

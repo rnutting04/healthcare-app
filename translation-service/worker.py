@@ -1,3 +1,4 @@
+import os
 import logging
 import sys
 from threading import Thread
@@ -23,8 +24,8 @@ def main():
     #pre-load model once into main thread
     #this model cache will be shared by all threads spawned in this process
     logger.info(f"Main process ({__name__}): Pre-loading all supported translation models...")
-    for lang_name in LANGUAGE_CODES.keys():
-        get_translation_pipeline(lang_name)
+    for code in LANGUAGE_CODES:
+        get_translation_pipeline(code)
     logger.info(f"Main Process ({__name__}): All models loaded and ready to be shared.")
 
     #create and start worker threads
