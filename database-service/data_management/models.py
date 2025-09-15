@@ -87,93 +87,28 @@ class Patient(models.Model):
     def __str__(self):
         return f"Patient {self.user_id}"
 
-# Clinician model removed as requested
-
-class Appointment(models.Model):
-    STATUS_CHOICES = [
-        ('SCHEDULED', 'Scheduled'),
-        ('CONFIRMED', 'Confirmed'),
-        ('IN_PROGRESS', 'In Progress'),
-        ('COMPLETED', 'Completed'),
-        ('CANCELLED', 'Cancelled'),
-        ('NO_SHOW', 'No Show'),
-    ]
-    
+class Clinician(models.Model):
     id = models.BigAutoField(primary_key=True)
-    patient = models.ForeignKey(Patient, on_delete=models.CASCADE, related_name='appointments')
-    clinician_id = models.IntegerField()
-    clinician_name = models.CharField(max_length=255)
-    appointment_date = models.DateTimeField()
-    duration_minutes = models.IntegerField(default=30)
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='SCHEDULED')
-    reason = models.TextField()
-    notes = models.TextField(blank=True)
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='clinician_profile')
+    specialization = models.ForeignKey(
+        'CancerType', 
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        limit_choices_to={'parent__isnull': True},  # Only parent cancer types
+        related_name='clinicians'
+    )
+    phone_number = models.CharField(max_length=20, blank=True, default='')
+    is_available = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     
     class Meta:
-        db_table = 'appointments'
-        managed = False
-        managed = False  # Don't create migrations
+        db_table = 'clinicians'
     
     def __str__(self):
-        return f"Appointment for Patient {self.patient.user_id} on {self.appointment_date}"
-
-class MedicalRecord(models.Model):
-    RECORD_TYPES = [
-        ('CONSULTATION', 'Consultation'),
-        ('LAB_RESULT', 'Lab Result'),
-        ('PRESCRIPTION', 'Prescription'),
-        ('IMAGING', 'Imaging'),
-        ('PROCEDURE', 'Procedure'),
-        ('VACCINATION', 'Vaccination'),
-    ]
-    
-    id = models.BigAutoField(primary_key=True)
-    patient = models.ForeignKey(Patient, on_delete=models.CASCADE, related_name='medical_records')
-    appointment = models.ForeignKey(Appointment, on_delete=models.SET_NULL, null=True, blank=True)
-    clinician_id = models.IntegerField()
-    clinician_name = models.CharField(max_length=255)
-    record_type = models.CharField(max_length=20, choices=RECORD_TYPES)
-    title = models.CharField(max_length=255)
-    description = models.TextField()
-    diagnosis = models.TextField(blank=True)
-    treatment = models.TextField(blank=True)
-    attachments = models.JSONField(default=list, blank=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-    
-    class Meta:
-        db_table = 'medical_records'
-        managed = False
-        managed = False  # Don't create migrations
-    
-    def __str__(self):
-        return f"{self.record_type} - {self.title}"
-
-class Prescription(models.Model):
-    id = models.BigAutoField(primary_key=True)
-    patient = models.ForeignKey(Patient, on_delete=models.CASCADE, related_name='prescriptions')
-    medical_record = models.ForeignKey(MedicalRecord, on_delete=models.CASCADE, null=True, blank=True)
-    clinician_id = models.IntegerField()
-    clinician_name = models.CharField(max_length=255)
-    medication_name = models.CharField(max_length=255)
-    dosage = models.CharField(max_length=100)
-    frequency = models.CharField(max_length=100)
-    duration = models.CharField(max_length=100)
-    instructions = models.TextField()
-    start_date = models.DateField()
-    end_date = models.DateField()
-    is_active = models.BooleanField(default=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-    
-    class Meta:
-        db_table = 'prescriptions'
-        managed = False
-        managed = False  # Don't create migrations
-    
-    def __str__(self):
-        return f"{self.medication_name} for Patient {self.patient.user_id}"
+        specialization_name = self.specialization.cancer_type if self.specialization else "No specialization"
+        return f"Dr. {self.user.first_name} {self.user.last_name} - {specialization_name}"
 
 class CancerType(models.Model):
     cancer_type = models.CharField(max_length=200)
@@ -199,6 +134,23 @@ class CancerType(models.Model):
         if self.parent:
             return f"{self.parent.cancer_type} - {self.cancer_type}"
         return self.cancer_type
+
+class MedicalRecordType(models.Model):
+    """
+    Predefined types of medical records that don't change.
+    """
+    id = models.BigAutoField(primary_key=True)
+    type_name = models.CharField(max_length=50, unique=True)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        db_table = 'medical_record_types'
+        ordering = ['type_name']
+    
+    def __str__(self):
+        return self.type_name
+
 
 class EventLog(models.Model):
     event_type = models.CharField(max_length=100)
@@ -252,6 +204,44 @@ class FileMetadata(models.Model):
     
     def __str__(self):
         return f"{self.filename} - {self.user.email}"
+
+
+class PatientAssignment(models.Model):
+    id = models.BigAutoField(primary_key=True)
+    patient = models.OneToOneField(Patient, on_delete=models.CASCADE, related_name='assignment')
+    cancer_subtype = models.ForeignKey(
+        CancerType, 
+        on_delete=models.PROTECT,
+        limit_choices_to={'parent__isnull': False},  # Only subtypes (have parent)
+        related_name='patient_assignments'
+    )
+    assigned_clinician = models.ForeignKey(
+        Clinician,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='assigned_patients'
+    )
+    notes = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    updated_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name='patient_assignments_updated'
+    )
+    
+    class Meta:
+        db_table = 'patient_assignments'
+        indexes = [
+            models.Index(fields=['patient']),
+            models.Index(fields=['assigned_clinician']),
+            models.Index(fields=['cancer_subtype']),
+        ]
+    
+    def __str__(self):
+        return f"Assignment for Patient {self.patient.id} - {self.cancer_subtype.cancer_type}"
 
 
 class FileAccessLog(models.Model):
@@ -313,54 +303,119 @@ class RefreshToken(models.Model):
         return f"Token for {self.user.email}"
 
 
-class DocumentEmbedding(models.Model):
-    """Links FileMetadata to its embeddings."""
-    file = models.OneToOneField(
-        FileMetadata, 
-        on_delete=models.CASCADE, 
-        primary_key=True, 
-        related_name='embedding'
-    )
-    total_chunks = models.IntegerField()
-    embedding_model = models.CharField(max_length=100)
-    processing_status = models.CharField(max_length=20, choices=[
-        ('queued', 'Queued'),
+class MedicalRecord(models.Model):
+    """
+    Medical records linking files to patients with record types.
+    Uses composite primary key of file, patient, and record type.
+    """
+    file = models.OneToOneField(FileMetadata, on_delete=models.CASCADE, primary_key=True, related_name='medical_record')
+    patient = models.ForeignKey(Patient, on_delete=models.CASCADE, related_name='medical_records')
+    medical_record_type = models.ForeignKey(MedicalRecordType, on_delete=models.PROTECT, related_name='medical_records')
+    uploaded_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='uploaded_medical_records')
+    # Store the encryption key encrypted with a master key (for emergency access)
+    record_encryption_key = models.TextField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        db_table = 'medical_records'
+        unique_together = [['file', 'patient', 'medical_record_type']]
+        indexes = [
+            models.Index(fields=['patient']),
+            models.Index(fields=['medical_record_type']),
+            models.Index(fields=['-created_at']),
+        ]
+    
+    def __str__(self):
+        return f"Medical Record: {self.file.filename} - Patient {self.patient.id} - {self.medical_record_type.type_name}"
+
+
+class MedicalRecordAccess(models.Model):
+    """
+    Grants access to medical records for specific users.
+    The record's encryption key is encrypted with each user's personal key.
+    """
+    medical_record = models.ForeignKey(MedicalRecord, on_delete=models.CASCADE, related_name='access_grants')
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='medical_record_access')
+    # The medical record's encryption key, encrypted with this user's personal key
+    encrypted_access_key = models.TextField()
+    granted_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='access_granted_by')
+    granted_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField(null=True, blank=True)
+    revoked_at = models.DateTimeField(null=True, blank=True)
+    
+    class Meta:
+        db_table = 'medical_record_access'
+        unique_together = [['medical_record', 'user']]
+        indexes = [
+            models.Index(fields=['user', '-granted_at']),
+            models.Index(fields=['medical_record', 'user']),
+        ]
+    
+    def __str__(self):
+        return f"{self.user.email} access to {self.medical_record}"
+    
+    @property
+    def is_active(self):
+        """Check if access is currently active"""
+        from django.utils import timezone
+        now = timezone.now()
+        if self.revoked_at and self.revoked_at <= now:
+            return False
+        if self.expires_at and self.expires_at <= now:
+            return False
+        return True
+
+
+# RAG Embedding models
+class RAGEmbedding(models.Model):
+    """Store document embeddings for RAG system with PGVector"""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    document = models.ForeignKey(RAGDocument, on_delete=models.CASCADE, related_name='embeddings')
+    chunk_index = models.IntegerField()
+    chunk_text = models.TextField()
+    embedding = models.JSONField()  # Will be handled as vector in queries
+    metadata = models.JSONField(default=dict, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        db_table = 'rag_embeddings'
+        ordering = ['document', 'chunk_index']
+        indexes = [
+            models.Index(fields=['document', 'chunk_index']),
+            models.Index(fields=['created_at']),
+        ]
+        unique_together = [['document', 'chunk_index']]
+    
+    def __str__(self):
+        return f"Embedding {self.chunk_index} for {self.document.file.filename}"
+
+
+class RAGEmbeddingJob(models.Model):
+    """Track embedding processing jobs"""
+    STATUS_CHOICES = [
+        ('pending', 'Pending'),
         ('processing', 'Processing'),
         ('completed', 'Completed'),
         ('failed', 'Failed'),
-    ], default='queued')
-    error_message = models.TextField(null=True, blank=True)
-    processed_at = models.DateTimeField(null=True, blank=True)
+        ('retrying', 'Retrying'),
+    ]
     
-    class Meta:
-        db_table = 'document_embeddings'
-        indexes = [
-            models.Index(fields=['processing_status']),
-        ]
-    
-    def __str__(self):
-        return f"Embeddings for {self.file.filename}"
-
-
-class EmbeddingChunk(models.Model):
-    """Stores individual embedding chunks for a document."""
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    document_embedding = models.ForeignKey(
-        DocumentEmbedding, 
-        on_delete=models.CASCADE, 
-        related_name='chunks'
-    )
-    chunk_index = models.IntegerField()
-    chunk_text = models.TextField()  # Full chunk text for RAG retrieval
-    embedding_vector = models.TextField()  # JSON serialized embedding vector
-    vector_dimension = models.IntegerField()
+    document = models.ForeignKey(RAGDocument, on_delete=models.CASCADE, related_name='embedding_jobs')
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    message = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+    retry_count = models.IntegerField(default=0)
     
     class Meta:
-        db_table = 'embedding_chunks'
-        unique_together = [['document_embedding', 'chunk_index']]
+        db_table = 'rag_embedding_jobs'
+        ordering = ['-created_at']
         indexes = [
-            models.Index(fields=['document_embedding', 'chunk_index']),
+            models.Index(fields=['status', '-created_at']),
+            models.Index(fields=['document']),
         ]
     
     def __str__(self):
-        return f"Chunk {self.chunk_index} of {self.document_embedding.file.filename}"
+        return f"Job {self.id} - {self.status}"

@@ -1,18 +1,22 @@
+"""
+URL configuration for clinician-service project.
+"""
 from django.contrib import admin
 from django.urls import path, include
-from django.conf import settings
-from django.conf.urls.static import static
 from rest_framework import permissions
 from drf_yasg.views import get_schema_view
 from drf_yasg import openapi
+from django.views.generic import RedirectView
+from django.conf import settings
+from django.conf.urls.static import static
 
 schema_view = get_schema_view(
     openapi.Info(
-        title="Healthcare Clinician Service API",
+        title="Clinician Service API",
         default_version='v1',
-        description="Clinician Management Service for Healthcare System",
+        description="API for managing clinician authentication and profiles",
         terms_of_service="https://www.google.com/policies/terms/",
-        contact=openapi.Contact(email="contact@healthcare.local"),
+        contact=openapi.Contact(email="admin@healthcare.com"),
         license=openapi.License(name="BSD License"),
     ),
     public=True,
@@ -21,15 +25,26 @@ schema_view = get_schema_view(
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('api/clinicians/', include('clinicians.urls')),
-    path('health/', include('clinicians.health_urls')),
-    path('', include('clinicians.template_urls')),
     
     # Swagger documentation
     path('swagger/', schema_view.with_ui('swagger', cache_timeout=0), name='schema-swagger-ui'),
     path('redoc/', schema_view.with_ui('redoc', cache_timeout=0), name='schema-redoc'),
+    
+    # API routes
+    path('api/', include('clinicians.urls')),
+    
+    # Template routes
+    path('clinician/', include('clinicians.template_urls')),
+    
+    # Health check
+    path('health/', include('clinicians.health_urls')),
+    
+    # Redirect root to dashboard
+    path('', RedirectView.as_view(url='/clinician/dashboard/', permanent=False)),
 ]
 
+# Serve static and media files in development
 if settings.DEBUG:
-    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
     urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
+    # Media files are served by nginx, not Django
+    # urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

@@ -1,6 +1,6 @@
 services:
   postgres:
-    image: postgres:15-alpine
+    image: pgvector/pgvector:pg15
     environment:
       POSTGRES_DB: healthcare_db
       POSTGRES_USER: healthcare_user
@@ -76,6 +76,8 @@ services:
     environment:
       - DATABASE_SERVICE_URL=http://database-service:8004
       - AUTH_SERVICE_URL=http://auth-service:8001
+      - FILE_SERVICE_URL=http://file-service:8006
+      - REDIS_URL=redis://redis:6379
       - SECRET_KEY=${SECRET_KEY:-your-secret-key-here}
       - DEBUG=${DEBUG:-True}
       - ALLOWED_HOSTS=${ALLOWED_HOSTS:-*}
@@ -83,8 +85,11 @@ services:
     depends_on:
       - database-service
       - auth-service
+      - redis
     volumes:
       - ./clinician-service:/app
+      - clinician-media:/app/media
+
 
   database-service:
     build:
@@ -119,6 +124,9 @@ services:
       - AUTH_SERVICE_URL=http://auth-service:8001
       - PATIENT_SERVICE_URL=http://patient-service:8002
       - CLINICIAN_SERVICE_URL=http://clinician-service:8003
+      - FILE_SERVICE_URL=http://file-service:8006
+      - RAG_EMBEDDING_SERVICE_URL=http://rag-embedding-service:8007
+      - OCR_SERVICE_URL=http://ocr-service:8008
       - SECRET_KEY=${SECRET_KEY:-your-secret-key-here}
       - DEBUG=${DEBUG:-True}
       - ALLOWED_HOSTS=${ALLOWED_HOSTS:-*}
@@ -149,33 +157,77 @@ services:
       - ./file-service:/app
       - file-storage:/app/media/encrypted_files
 
-  embedding-service:
+  rag-embedding-service:
     build:
-      context: ./embedding-service
+      context: ./rag-embedding-service
       dockerfile: Dockerfile
     ports:
       - "8007:8007"
     environment:
+      - DATABASE_SERVICE_URL=http://database-service:8004
+      - FILE_SERVICE_URL=http://file-service:8006
+      - REDIS_URL=redis://redis:6379
+      - DATABASE_SERVICE_TOKEN=${DATABASE_SERVICE_TOKEN:-db-service-secret-token}
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-your-secret-key-here}
       - SECRET_KEY=${SECRET_KEY:-your-secret-key-here}
       - DEBUG=${DEBUG:-True}
       - ALLOWED_HOSTS=${ALLOWED_HOSTS:-*}
-      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-your-secret-key-here}
-      - DATABASE_SERVICE_URL=http://database-service:8004
-      - AUTH_SERVICE_URL=http://auth-service:8001
       - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - OPENAI_EMBEDDING_MODEL=${OPENAI_EMBEDDING_MODEL:-text-embedding-ada-002}
-      - OPENAI_MAX_TOKENS_PER_CHUNK=${OPENAI_MAX_TOKENS_PER_CHUNK:-8000}
-      - MAX_CONCURRENT_EMBEDDINGS=${MAX_CONCURRENT_EMBEDDINGS:-3}
-      - EMBEDDING_RETRY_MAX_ATTEMPTS=${EMBEDDING_RETRY_MAX_ATTEMPTS:-3}
-      - EMBEDDING_RETRY_DELAY=${EMBEDDING_RETRY_DELAY:-60}
-      - MAX_FILE_SIZE=${MAX_FILE_SIZE:-52428800}
-      - ALLOWED_FILE_TYPES=${ALLOWED_FILE_TYPES:-.pdf,.txt,.doc,.docx}
+      - OPENAI_EMBEDDING_MODEL=${OPENAI_EMBEDDING_MODEL:-text-embedding-3-small}
+      - RAG_CHUNK_SIZE=${RAG_CHUNK_SIZE:-1000}
+      - RAG_CHUNK_OVERLAP=${RAG_CHUNK_OVERLAP:-200}
+      - RAG_MAX_CONCURRENT_PROCESSING=${RAG_MAX_CONCURRENT_PROCESSING:-3}
+      - RAG_PROCESSING_TIMEOUT=${RAG_PROCESSING_TIMEOUT:-300}
+      - RAG_RETRY_MAX_ATTEMPTS=${RAG_RETRY_MAX_ATTEMPTS:-3}
+      - RAG_RETRY_DELAY=${RAG_RETRY_DELAY:-60}
+      - REDIS_DB=${REDIS_DB:-1}
     depends_on:
       - database-service
-      - auth-service
+      - file-service
+      - redis
     volumes:
-      - ./embedding-service:/app
-      - embedding-temp:/app/media/temp_files
+      - ./rag-embedding-service:/app
+      - rag-temp-files:/app/media/temp_files
+
+  ocr-service:
+    build:
+      context: ./ocr-service
+      dockerfile: Dockerfile
+    ports:
+      - "8008:8008"
+    environment:
+      - DATABASE_SERVICE_URL=http://database-service:8004
+      - FILE_SERVICE_URL=http://file-service:8006
+      - REDIS_URL=redis://redis:6379
+      - DATABASE_SERVICE_TOKEN=${DATABASE_SERVICE_TOKEN:-db-service-secret-token}
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-your-secret-key-here}
+      - SECRET_KEY=${SECRET_KEY:-your-secret-key-here}
+      - DEBUG=${DEBUG:-True}
+      - ALLOWED_HOSTS=${ALLOWED_HOSTS:-*}
+      - OCR_REDIS_DB=${OCR_REDIS_DB:-2}
+      - OCR_MAX_FILE_SIZE_MB=${OCR_MAX_FILE_SIZE_MB:-50}
+      - OCR_ALLOWED_EXTENSIONS=${OCR_ALLOWED_EXTENSIONS:-.txt,.rtf,.pdf,.jpg,.jpeg,.png,.bmp,.tiff}
+      - OCR_GPU_THRESHOLD=${OCR_GPU_THRESHOLD:-0.5}
+      - OCR_MODEL_GPU=${OCR_MODEL_GPU:-microsoft/trocr-large-printed}
+      - OCR_MODEL_CPU=${OCR_MODEL_CPU:-microsoft/trocr-base-printed}
+      - OCR_MAX_CONCURRENT_JOBS=${OCR_MAX_CONCURRENT_JOBS:-3}
+      - OCR_JOB_TIMEOUT=${OCR_JOB_TIMEOUT:-300}
+      - OCR_CLEANUP_DELAY=${OCR_CLEANUP_DELAY:-60}
+      - OCR_PDF_DPI=${OCR_PDF_DPI:-400}
+      - OCR_PDF_FORMAT=${OCR_PDF_FORMAT:-PNG}
+    depends_on:
+      - database-service
+      - redis
+    volumes:
+      - ./ocr-service:/app
+      - ocr-temp-files:/app/media/temp_files
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
 
   translation-service:
     build:
@@ -225,10 +277,12 @@ services:
       - database-service
       - admin-service
       - file-service
-      - embedding-service
+      - rag-embedding-service
       - translation-service
+      - ocr-service
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - clinician-media:/media
       - patient-static:/patient-static
       - auth-static:/auth-static
       - admin-static:/admin-static
@@ -256,3 +310,6 @@ volumes:
   file-storage:
   embedding-temp:
   huggingface-cache:
+  rag-temp-files:
+  clinician-media:
+  ocr-temp-files:

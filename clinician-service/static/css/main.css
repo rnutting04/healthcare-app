@@ -1,0 +1,73 @@
+/* Quick Actions Animation Styles */
+#actionButtons {
+    transition: opacity 200ms ease-in-out;
+    opacity: 1;
+}
+
+#actionButtons.hiding {
+    opacity: 0;
+    pointer-events: none;
+}
+
+#actionButtons.hidden {
+    display: none;
+}
+
+#patientListPanel {
+    opacity: 0;
+    transform: translateY(10px);
+    transition: opacity 200ms ease-in-out, transform 200ms ease-in-out;
+    pointer-events: none;
+    position: absolute;
+    inset: 0;
+    margin-top: 0;
+}
+
+#patientListPanel.showing {
+    opacity: 1;
+    transform: translateY(0);
+    pointer-events: auto;
+}
+
+#quickActionsContainer {
+    min-height: 200px;
+    transition: min-height 200ms ease-in-out;
+}
+
+#quickActionsContainer.expanded {
+    min-height: 500px;
+}
+
+/* Loading States */
+.loading-spinner {
+    border: 2px solid #f3f3f3;
+    border-top: 2px solid #3498db;
+    border-radius: 50%;
+    width: 20px;
+    height: 20px;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Custom scrollbar for patient list */
+#patientListContent::-webkit-scrollbar {
+    width: 6px;
+}
+
+#patientListContent::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 3px;
+}
+
+#patientListContent::-webkit-scrollbar-thumb {
+    background: #888;
+    border-radius: 3px;
+}
+
+#patientListContent::-webkit-scrollbar-thumb:hover {
+    background: #555;
+}

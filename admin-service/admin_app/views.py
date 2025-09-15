@@ -7,6 +7,7 @@ from django.conf import settings
 from .services import DatabaseService
 import logging
 import requests
+import json
 
 logger = logging.getLogger(__name__)
 
@@ -190,8 +191,6 @@ def cancer_type_delete(request, cancer_type_id):
     
     return redirect('cancer_types_list')
 
-
-
 # User Management Views
 def users_list(request):
     """List all users"""
@@ -243,97 +242,126 @@ def user_detail(request, user_id):
     try:
         from datetime import datetime
         
-        response = DatabaseService.get_user(user_id)
-        # The database-service returns the user directly, not wrapped in 'data'
-        user_data = response
+        # Get user data
+        user_data = DatabaseService.get_user(user_id)
         
-        # Convert date strings to datetime objects for template formatting
-        if user_data.get('date_joined'):
-            try:
-                user_data['date_joined'] = datetime.fromisoformat(user_data['date_joined'].replace('Z', '+00:00'))
-            except:
-                pass
-        if user_data.get('last_login'):
-            try:
-                user_data['last_login'] = datetime.fromisoformat(user_data['last_login'].replace('Z', '+00:00'))
-            except:
-                pass
-        
-        # If user is a patient, fetch patient-specific information
-        patient_data = None
-        languages = []
-        if user_data.get('role_name') == 'PATIENT':
-            try:
-                patient_response = DatabaseService.get_patient_by_user(user_id)
-                patient_data = patient_response
-                # logger.info(f"Successfully fetched patient data for user {user_id}: {patient_data}")
-                
-                # Fetch available languages
+        # Convert date strings to datetime objects
+        for field in ['date_joined', 'last_login']:
+            if user_data.get(field):
                 try:
-                    # Use the user's token from cookies or create a service token
-                    auth_header = None
-                    
-                    # First try to get token from cookies
-                    access_token = request.COOKIES.get('access_token')
-                    if access_token:
-                        auth_header = f'Bearer {access_token}'
-                    else:
-                        # If no user token, use a service account approach
-                        # For now, use the admin's token that was used to fetch patient data
-                        auth_header = request.META.get('HTTP_AUTHORIZATION', '')
-                    
-                    headers = {}
-                    if auth_header:
-                        headers['Authorization'] = auth_header
-                    
-                    # logger.info(f"Fetching languages from: {settings.PATIENT_SERVICE_URL}/api/patients/languages/")
-                    languages_response = requests.get(
-                        f"{settings.PATIENT_SERVICE_URL}/api/patients/languages/",
-                        headers=headers
-                    )
-                    # logger.info(f"Languages response status: {languages_response.status_code}")
-                    # logger.info(f"Auth header being sent: {auth_header}")
-                    if languages_response.status_code == 200:
-                        languages_data = languages_response.json()
-                        # logger.info(f"Languages response data: {languages_data}")
-                        # Handle paginated response
-                        # Ensure we're updating the outer scope languages variable
-                        if isinstance(languages_data, list):
-                            languages = languages_data
-                        else:
-                            languages = languages_data.get('results', languages_data)
-                        # logger.info(f"Fetched {len(languages)} languages")
-                        # logger.info(f"Languages list: {languages}")
-                        
-                        # Log the preferred language to debug
-                        if patient_data:
-                            # logger.info(f"Patient preferred_language value: {patient_data.get('preferred_language')}")
-                            pass
-                    else:
-                        # logger.warning(f"Failed to fetch languages: {languages_response.status_code}")
-                        # logger.warning(f"Response content: {languages_response.text}")
-                        pass
-                except Exception as e:
-                    # logger.warning(f"Could not fetch languages: {str(e)}")
+                    user_data[field] = datetime.fromisoformat(user_data[field].replace('Z', '+00:00'))
+                except:
                     pass
-            except Exception as e:
-                # logger.warning(f"Could not fetch patient data for user {user_id}: {str(e)}")
-                pass
         
-        # logger.info(f"DEBUG: Languages before context: {languages}")
-        # logger.info(f"DEBUG: Number of languages: {len(languages)}")
-        
+        # Initialize context data
         context = {
-            'user': user_data,  # Template expects 'user'
-            'patient_data': patient_data,  # Patient-specific data
-            'current_user': request.user_data,  # Current logged-in user
-            'languages': languages  # Available languages
+            'user': user_data,
+            'current_user': request.user_data,
+            'patient_data': None,
+            'clinician_data': None,
+            'languages': [],
+            'cancer_types': []
         }
+        
+        # Get role-specific data
+        role = user_data.get('role_name')
+        
+        if role == 'PATIENT':
+            context['patient_data'] = _get_patient_data(user_id)
+            context['languages'] = _get_languages(request)
+            # Get patient assignment if patient data exists
+            if context['patient_data']:
+                context['assignment_data'] = _get_patient_assignment(context['patient_data']['id'])
+                context['cancer_subtypes'] = _get_all_cancer_subtypes()
+                context['available_clinicians'] = _get_available_clinicians()
+        elif role == 'CLINICIAN':
+            context['clinician_data'] = _get_clinician_data(user_id)
+            context['cancer_types'] = _get_parent_cancer_types()
+        
         return render(request, 'user_detail.html', context)
+        
     except Exception as e:
         logger.error(f"User detail error: {str(e)}")
         messages.error(request, f"Error loading user details: {str(e)}")
         return redirect('users_list')
+
+def _get_patient_data(user_id):
+    """Helper to get patient data"""
+    try:
+        return DatabaseService.get_patient_by_user(user_id)
+    except Exception as e:
+        logger.warning(f"Could not fetch patient data for user {user_id}: {str(e)}")
+        return None
+
+def _get_clinician_data(user_id):
+    """Helper to get clinician data"""
+    try:
+        return DatabaseService.get_clinician_by_user(user_id)
+    except Exception as e:
+        logger.warning(f"Could not fetch clinician data for user {user_id}: {str(e)}")
+        return None
+
+def _get_languages(request):
+    """Helper to get available languages"""
+    try:
+        token = request.COOKIES.get('access_token') or request.META.get('HTTP_AUTHORIZATION', '')
+        headers = {'Authorization': f'Bearer {token}'} if token else {}
+        
+        response = requests.get(f"{settings.PATIENT_SERVICE_URL}/api/patients/languages/", headers=headers)
+        if response.status_code == 200:
+            data = response.json()
+            return data if isinstance(data, list) else data.get('results', [])
+    except Exception as e:
+        logger.warning(f"Could not fetch languages: {str(e)}")
+    return []
+
+def _get_parent_cancer_types():
+    """Helper to get parent cancer types"""
+    try:
+        response = DatabaseService.get_cancer_types()
+        data = response if isinstance(response, list) else response.get('results', [])
+        return [ct for ct in data if ct.get('parent') is None]
+    except Exception as e:
+        logger.warning(f"Could not fetch cancer types: {str(e)}")
+        return []
+
+def _get_patient_assignment(patient_id):
+    """Helper to get patient assignment"""
+    try:
+        return DatabaseService.get_patient_assignment(patient_id)
+    except Exception as e:
+        logger.warning(f"Could not fetch patient assignment: {str(e)}")
+        return None
+
+def _get_all_cancer_subtypes():
+    """Helper to get all cancer subtypes grouped by parent"""
+    try:
+        response = DatabaseService.get_cancer_types()
+        data = response if isinstance(response, list) else response.get('results', [])
+        
+        # Group subtypes by parent
+        grouped = {}
+        for ct in data:
+            if ct.get('parent'):
+                parent_id = ct['parent']
+                parent_name = ct.get('parent_details', {}).get('cancer_type', f'Parent {parent_id}')
+                
+                if parent_name not in grouped:
+                    grouped[parent_name] = []
+                grouped[parent_name].append(ct)
+        
+        return grouped
+    except Exception as e:
+        logger.warning(f"Could not fetch cancer subtypes: {str(e)}")
+        return {}
+
+def _get_available_clinicians():
+    """Helper to get available clinicians"""
+    try:
+        return DatabaseService.get_available_clinicians()
+    except Exception as e:
+        logger.warning(f"Could not fetch clinicians: {str(e)}")
+        return []
 
 # Patient Management
 @require_http_methods(["POST"])
@@ -382,6 +410,88 @@ def update_patient_info(request, patient_id):
                 return redirect('user_detail', user_id=user_data['id'])
     except:
         pass
+    
+    return redirect('users_list')
+
+# Clinician Management
+@require_http_methods(["POST"])
+def update_clinician_info(request, clinician_id):
+    """Update clinician information"""
+    try:
+        data = {}
+        
+        # Get phone number if provided
+        phone = request.POST.get('phone_number')
+        if phone is not None:
+            data['phone_number'] = phone
+        
+        # Get specialization if provided
+        specialization = request.POST.get('specialization_id')
+        if specialization:
+            data['specialization'] = int(specialization) if specialization else None
+        
+        # Update clinician info via database service
+        if data:
+            DatabaseService.update_clinician(clinician_id, data)
+            messages.success(request, "Clinician information updated successfully")
+        
+    except Exception as e:
+        logger.error(f"Clinician update error: {str(e)}")
+        messages.error(request, f"Error updating clinician information: {str(e)}")
+    
+    # Redirect back to user detail page
+    referrer = request.META.get('HTTP_REFERER')
+    if referrer and '/users/' in referrer:
+        try:
+            user_id = referrer.split('/users/')[-1].rstrip('/')
+            return redirect('user_detail', user_id=user_id)
+        except:
+            pass
+    
+    return redirect('users_list')
+
+# Patient Assignment Management
+@require_http_methods(["POST"])
+def update_patient_assignment(request, patient_id):
+    """Update patient assignment (cancer subtype and clinician)"""
+    try:
+        data = {
+            'patient': patient_id,  # Use 'patient' not 'patient_id' to match model field
+            'updated_by': request.user_data.get('user_id')  # Current admin user
+        }
+        
+        # Get cancer subtype if provided
+        cancer_subtype = request.POST.get('cancer_subtype_id')
+        if cancer_subtype:
+            data['cancer_subtype'] = int(cancer_subtype)
+        
+        # Get assigned clinician if provided
+        clinician = request.POST.get('assigned_clinician_id')
+        if clinician and clinician != "":
+            data['assigned_clinician'] = int(clinician)
+        else:
+            data['assigned_clinician'] = None
+        
+        # Get notes if provided
+        notes = request.POST.get('assignment_notes', '')
+        data['notes'] = notes
+        
+        # Create or update assignment
+        DatabaseService.create_or_update_patient_assignment(data)
+        messages.success(request, "Patient assignment updated successfully")
+        
+    except Exception as e:
+        logger.error(f"Patient assignment update error: {str(e)}")
+        messages.error(request, f"Error updating patient assignment: {str(e)}")
+    
+    # Redirect back to user detail page
+    referrer = request.META.get('HTTP_REFERER')
+    if referrer and '/users/' in referrer:
+        try:
+            user_id = referrer.split('/users/')[-1].rstrip('/')
+            return redirect('user_detail', user_id=user_id)
+        except:
+            pass
     
     return redirect('users_list')
 
@@ -434,48 +544,32 @@ def document_upload(request):
                                 'size': file.size
                             })
                             
-                            # Send file to embedding service
+                            # Trigger embedding process in rag-embedding-service
                             try:
-                                # First, retrieve the unencrypted file from file service
-                                file_url = f"{settings.FILE_SERVICE_URL}/api/files/{file_id}"
-                                file_response = requests.get(file_url, headers=headers)
+                                embedding_url = f"{settings.RAG_EMBEDDING_SERVICE_URL}/api/rag/embeddings/process/"
+                                embedding_data = {
+                                    'document_id': file_id,
+                                    'cancer_type_id': cancer_type_id
+                                }
+                                embedding_headers = {'Authorization': f'Bearer {token}'}
                                 
-                                if file_response.status_code == 200:
-                                    # Now send to embedding service
-                                    embedding_url = f"{settings.EMBEDDING_SERVICE_URL}/embeddings/process/"
-                                    
-                                    # Get file content and prepare for multipart upload
-                                    file_content = file_response.content
-                                    files_for_embedding = {
-                                        'file': (file.name, file_content, file_response.headers.get('Content-Type', 'application/octet-stream'))
-                                    }
-                                    embedding_data = {
-                                        'document_id': file_id,
-                                        'priority': 1  # Higher priority for admin uploads
-                                    }
-                                    
-                                    embedding_response = requests.post(
-                                        embedding_url,
-                                        files=files_for_embedding,
-                                        data=embedding_data,
-                                        headers={'Authorization': f'Bearer {token}'}
-                                    )
-                                    
-                                    if embedding_response.status_code == 200:
-                                        embedding_result = embedding_response.json()
-                                        uploaded_files[-1]['embedding_status'] = 'queued'
-                                        uploaded_files[-1]['queue_position'] = embedding_result.get('queue_position', 'N/A')
-                                        logger.info(f"File {file_id} queued for embedding processing")
-                                    else:
-                                        logger.error(f"Failed to queue file for embedding: {embedding_response.text}")
-                                        uploaded_files[-1]['embedding_status'] = 'failed'
+                                embedding_response = requests.post(
+                                    embedding_url, 
+                                    json=embedding_data, 
+                                    headers=embedding_headers
+                                )
+                                
+                                if embedding_response.status_code == 202:
+                                    embedding_result = embedding_response.json()
+                                    uploaded_files[-1]['embedding_job_id'] = embedding_result.get('job_id')
+                                    uploaded_files[-1]['embedding_status'] = 'queued'
                                 else:
-                                    logger.error(f"Failed to retrieve file for embedding: {file_response.status_code}")
+                                    logger.warning(f"Embedding service returned {embedding_response.status_code} for {file.name}")
                                     uploaded_files[-1]['embedding_status'] = 'failed'
-                                    
                             except Exception as e:
-                                logger.error(f"Error sending file to embedding service: {str(e)}")
+                                logger.error(f"Failed to trigger embedding for {file.name}: {str(e)}")
                                 uploaded_files[-1]['embedding_status'] = 'error'
+                                
                         else:
                             errors.append(f"Failed to associate {file.name} with cancer type")
                     else:
@@ -584,20 +678,7 @@ def api_delete_rag_document(request, file_id):
             logger.error(f"Failed to delete file from file service: {file_response.status_code}")
             # Continue with database deletion even if file deletion fails
         
-        # Step 2: Delete embeddings and chunks from database service
-        embedding_headers = {
-            'X-Service-Token': getattr(settings, 'DATABASE_SERVICE_TOKEN', 'db-service-secret-token')
-        }
-        embedding_response = requests.delete(
-            f"{settings.DATABASE_SERVICE_URL}/api/embeddings/{file_id}/delete/",
-            headers=embedding_headers
-        )
-        
-        if embedding_response.status_code not in [200, 204, 404]:
-            logger.error(f"Failed to delete embeddings from database: {embedding_response.status_code}")
-            # Continue with RAG document deletion even if embedding deletion fails
-        
-        # Step 3: Delete the RAG document from database service
+        # Step 2: Delete the RAG document from database service
         db_headers = {
             'X-Service-Token': getattr(settings, 'DATABASE_SERVICE_TOKEN', 'db-service-secret-token')
         }
@@ -611,7 +692,7 @@ def api_delete_rag_document(request, file_id):
             logger.error(f"Failed to delete RAG document from database: {db_response.status_code}")
             return JsonResponse({'error': 'Failed to delete document record'}, status=500)
         
-        return JsonResponse({'message': 'Document and embeddings deleted successfully'})
+        return JsonResponse({'message': 'Document deleted successfully'})
         
     except Exception as e:
         logger.error(f"Error deleting RAG document: {str(e)}")
@@ -619,28 +700,127 @@ def api_delete_rag_document(request, file_id):
 
 # API endpoint for checking embedding status
 def api_embedding_status(request, document_id):
-    """Check embedding status for a specific document"""
+    """Check embedding status for a document"""
     try:
         # Get JWT token for authentication
         token = request.COOKIES.get('access_token')
-        headers = {'Authorization': f'Bearer {token}'}
+        if not token:
+            return JsonResponse({'error': 'Authentication required'}, status=401)
         
-        # Check embedding status
-        embedding_url = f"{settings.EMBEDDING_SERVICE_URL}/embeddings/status/{document_id}/"
-        response = requests.get(embedding_url, headers=headers)
+        # First check if document has embeddings in database
+        db_headers = {
+            'X-Service-Token': getattr(settings, 'DATABASE_SERVICE_TOKEN', 'db-service-secret-token')
+        }
         
-        if response.status_code == 200:
-            return JsonResponse(response.json())
-        else:
-            return JsonResponse({
-                'error': 'Failed to get embedding status',
-                'status': 'unknown'
-            }, status=response.status_code)
-            
+        # Check for embedding job status
+        job_response = requests.get(
+            f"{settings.DATABASE_SERVICE_URL}/api/rag/embedding-jobs/?document={document_id}&ordering=-created_at",
+            headers=db_headers
+        )
+        
+        if job_response.status_code == 200:
+            job_data = job_response.json()
+            # Handle paginated response
+            if isinstance(job_data, dict) and 'results' in job_data:
+                jobs = job_data.get('results', [])
+                if jobs and len(jobs) > 0:
+                    latest_job = jobs[0]
+                    status = latest_job.get('status', 'unknown')
+                    
+                    # Map job status to response
+                    if status == 'completed':
+                        # Check for actual embeddings
+                        check_response = requests.get(
+                            f"{settings.DATABASE_SERVICE_URL}/api/rag/embeddings/?document={document_id}",
+                            headers=db_headers
+                        )
+                        if check_response.status_code == 200:
+                            embeddings_data = check_response.json()
+                            count = embeddings_data.get('count', 0) if isinstance(embeddings_data, dict) else len(embeddings_data)
+                            return JsonResponse({
+                                'status': 'completed',
+                                'progress': 100,
+                                'message': f"Embeddings created: {count} chunks",
+                                'chunks_count': count
+                            })
+                    elif status == 'processing':
+                        # Parse message to get progress data if available
+                        message_text = latest_job.get('message', 'Processing document...')
+                        progress_data = {}
+                        try:
+                            message_obj = json.loads(message_text)
+                            if isinstance(message_obj, dict):
+                                message_text = message_obj.get('text', message_text)
+                                progress_data = message_obj.get('progress', {})
+                        except:
+                            pass
+                        
+                        return JsonResponse({
+                            'status': 'processing',
+                            'job_id': latest_job.get('id'),
+                            'message': message_text,
+                            'progress': progress_data
+                        })
+                    elif status == 'pending':
+                        return JsonResponse({
+                            'status': 'pending',
+                            'job_id': latest_job.get('id'),
+                            'progress': 0,
+                            'message': 'Document queued for processing'
+                        })
+                    elif status == 'failed':
+                        return JsonResponse({
+                            'status': 'error',
+                            'progress': 0,
+                            'message': latest_job.get('message', 'Processing failed')
+                        })
+                    elif status == 'retrying':
+                        return JsonResponse({
+                            'status': 'processing',
+                            'progress': 30,
+                            'message': f"Retrying... (attempt {latest_job.get('retry_count', 0) + 1})"
+                        })
+        
+        # If no job found, check if embeddings exist
+        check_response = requests.get(
+            f"{settings.DATABASE_SERVICE_URL}/api/rag/embeddings/?document={document_id}",
+            headers=db_headers
+        )
+        
+        if check_response.status_code == 200:
+            embeddings_data = check_response.json()
+            # Handle DRF paginated response
+            if isinstance(embeddings_data, dict) and 'results' in embeddings_data:
+                count = embeddings_data.get('count', 0)
+                if count > 0:
+                    return JsonResponse({
+                        'status': 'completed',
+                        'progress': 100,
+                        'message': f"Embeddings created: {count} chunks",
+                        'chunks_count': count
+                    })
+            # Handle list response
+            elif isinstance(embeddings_data, list):
+                count = len(embeddings_data)
+                if count > 0:
+                    return JsonResponse({
+                        'status': 'completed',
+                        'progress': 100,
+                        'message': f"Embeddings created: {count} chunks",
+                        'chunks_count': count
+                    })
+        
+        # Default status
+        return JsonResponse({
+            'status': 'not_started',
+            'progress': 0,
+            'message': 'Embedding not started'
+        })
+        
     except Exception as e:
         logger.error(f"Error checking embedding status: {str(e)}")
         return JsonResponse({
-            'error': 'Failed to check embedding status',
+            'error': 'Failed to check status',
             'status': 'error'
         }, status=500)
 

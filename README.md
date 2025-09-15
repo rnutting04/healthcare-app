@@ -1,16 +1,18 @@
 # Healthcare Microservices System
 
-A comprehensive microservice architecture for a healthcare system with role-based access control for Patients, Clinicians, and Administrators.
+A comprehensive microservice architecture for a healthcare system with role-based access control for Patients and Administrators.
 
 ## Architecture Overview
 
-The system consists of 5 main services:
+The system consists of 7 main services:
 
 1. **Auth Service** (Port 8001): Handles authentication, authorization, and JWT token management
-2. **Patient Service** (Port 8002): Manages patient data, appointments, and medical records
-3. **Clinician Service** (Port 8003): Manages clinician profiles, schedules, and patient assignments
+2. **Patient Service** (Port 8002): Manages patient data and profile information
+3. **Clinician Service** (Port 8003): Manages clinician authentication and dashboard
 4. **Database Service** (Port 8004): Centralized database operations with Redis caching
-5. **Nginx**: Reverse proxy for routing requests to appropriate services
+5. **Admin Service** (Port 8005): Administrative dashboard and user management
+6. **File Service** (Port 8006): Secure file storage and management
+7. **Nginx**: Reverse proxy for routing requests to appropriate services
 
 ## Technology Stack
 
@@ -67,6 +69,7 @@ docker-compose exec auth-service python manage.py createsuperuser
 - Patient Service: http://localhost:8002
 - Clinician Service: http://localhost:8003
 - Database Service: http://localhost:8004
+- Admin Service: http://localhost:8005
 
 ## API Documentation
 
@@ -75,11 +78,12 @@ Each service provides Swagger documentation:
 - Patient Service: http://localhost:8002/swagger/
 - Clinician Service: http://localhost:8003/swagger/
 - Database Service: http://localhost:8004/swagger/
+- Admin Service: http://localhost:8005/swagger/
 
 ## User Roles
 
-1. **Patient**: Can view and manage their appointments, medical records, and prescriptions
-2. **Clinician**: Can manage patient appointments, create medical records, and prescribe medications
+1. **Patient**: Can view and manage their profile information
+2. **Clinician**: Can access clinician dashboard and manage patient care (stub implementation)
 3. **Admin**: Full access to all system features
 
 ## Deployment
@@ -116,6 +120,7 @@ Each service exposes a health endpoint:
 - Patient: `/health/patient`
 - Clinician: `/health/clinician`
 - Database: `/health/database`
+- Admin: `/health/admin`
 - Combined: `/health`
 
 ## Development Workflow

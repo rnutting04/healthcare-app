@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import User, Role, Patient, Appointment, MedicalRecord, Prescription, EventLog, CancerType, FileMetadata, RAGDocument, Language, DocumentEmbedding, EmbeddingChunk
+from .models import User, Role, Patient, Clinician, EventLog, CancerType, FileMetadata, RAGDocument, Language, RAGEmbedding, RAGEmbeddingJob, PatientAssignment, MedicalRecordType, MedicalRecord, MedicalRecordAccess
 
 class LanguageSerializer(serializers.ModelSerializer):
     class Meta:
@@ -34,67 +34,49 @@ class PatientSerializer(serializers.ModelSerializer):
     address = serializers.CharField(allow_blank=True, required=False)
     emergency_contact_name = serializers.CharField(allow_blank=True, required=False)
     emergency_contact_phone = serializers.CharField(allow_blank=True, required=False)
+    user = UserSerializer(read_only=True)
+    assignment = serializers.SerializerMethodField()
     
     class Meta:
         model = Patient
         fields = '__all__'
         read_only_fields = ['created_at', 'updated_at']
+    
+    def get_assignment(self, obj):
+        """Get patient assignment details if available"""
+        try:
+            if hasattr(obj, 'assignment'):
+                assignment = obj.assignment
+                return {
+                    'id': assignment.id,
+                    'cancer_subtype': assignment.cancer_subtype.id if assignment.cancer_subtype else None,
+                    'cancer_subtype_name': assignment.cancer_subtype.cancer_type if assignment.cancer_subtype else None,
+                    'assigned_clinician': assignment.assigned_clinician.id if assignment.assigned_clinician else None,
+                    'notes': assignment.notes,
+                    'created_at': assignment.created_at.isoformat() if assignment.created_at else None,
+                    'updated_at': assignment.updated_at.isoformat() if assignment.updated_at else None
+                }
+        except:
+            pass
+        return None
 
-# class ClinicianSerializer(serializers.ModelSerializer):
-#     user = UserSerializer(read_only=True)
-#     
-#     class Meta:
-#         model = Clinician
-#         fields = '__all__'
-#         read_only_fields = ['created_at', 'updated_at']
-
-class AppointmentSerializer(serializers.ModelSerializer):
-    patient_name = serializers.SerializerMethodField()
-    clinician_name = serializers.SerializerMethodField()
+class ClinicianSerializer(serializers.ModelSerializer):
+    user = UserSerializer(read_only=True)
+    specialization_detail = serializers.SerializerMethodField()
     
     class Meta:
-        model = Appointment
+        model = Clinician
         fields = '__all__'
         read_only_fields = ['created_at', 'updated_at']
     
-    def get_patient_name(self, obj):
-        # Since Patient only has user_id, we can't get the name directly
-        return f"Patient ID: {obj.patient.user_id}"
-    
-    def get_clinician_name(self, obj):
-        return obj.clinician_name
-
-class MedicalRecordSerializer(serializers.ModelSerializer):
-    patient_name = serializers.SerializerMethodField()
-    clinician_name = serializers.SerializerMethodField()
-    
-    class Meta:
-        model = MedicalRecord
-        fields = '__all__'
-        read_only_fields = ['created_at', 'updated_at']
-    
-    def get_patient_name(self, obj):
-        # Since Patient only has user_id, we can't get the name directly
-        return f"Patient ID: {obj.patient.user_id}"
-    
-    def get_clinician_name(self, obj):
-        return obj.clinician_name
-
-class PrescriptionSerializer(serializers.ModelSerializer):
-    patient_name = serializers.SerializerMethodField()
-    clinician_name = serializers.SerializerMethodField()
-    
-    class Meta:
-        model = Prescription
-        fields = '__all__'
-        read_only_fields = ['created_at']
-    
-    def get_patient_name(self, obj):
-        # Since Patient only has user_id, we can't get the name directly
-        return f"Patient ID: {obj.patient.user_id}"
-    
-    def get_clinician_name(self, obj):
-        return obj.clinician_name
+    def get_specialization_detail(self, obj):
+        if obj.specialization:
+            return {
+                'id': obj.specialization.id,
+                'cancer_type': obj.specialization.cancer_type,
+                'description': obj.specialization.description
+            }
+        return None
 
 class CancerTypeSerializer(serializers.ModelSerializer):
     subtypes = serializers.SerializerMethodField()
@@ -124,17 +106,6 @@ class EventLogSerializer(serializers.ModelSerializer):
         fields = '__all__'
         read_only_fields = ['created_at']
 
-class MedicalRecordCreateSerializer(serializers.Serializer):
-    patient_id = serializers.IntegerField()
-    clinician_id = serializers.IntegerField()
-    clinician_name = serializers.CharField()
-    record_type = serializers.CharField()
-    title = serializers.CharField()
-    description = serializers.CharField()
-    diagnosis = serializers.CharField(required=False, allow_blank=True)
-    treatment = serializers.CharField(required=False, allow_blank=True)
-
-
 class FileMetadataSerializer(serializers.ModelSerializer):
     class Meta:
         model = FileMetadata
@@ -151,19 +122,139 @@ class RAGDocumentSerializer(serializers.ModelSerializer):
         fields = ['file', 'cancer_type', 'cancer_type_name', 'file_data']
 
 
-class EmbeddingChunkSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = EmbeddingChunk
-        fields = ['id', 'chunk_index', 'chunk_text', 'embedding_vector', 'vector_dimension']
-        read_only_fields = ['id']
-
-
-class DocumentEmbeddingSerializer(serializers.ModelSerializer):
-    chunks = EmbeddingChunkSerializer(many=True, read_only=True)
-    file_data = FileMetadataSerializer(source='file', read_only=True)
+# RAG Embedding serializers
+class RAGEmbeddingSerializer(serializers.ModelSerializer):
+    document_name = serializers.CharField(source='document.file.filename', read_only=True)
     
     class Meta:
-        model = DocumentEmbedding
-        fields = ['file', 'total_chunks', 'embedding_model', 'processing_status', 
-                  'error_message', 'processed_at', 'chunks', 'file_data']
-        read_only_fields = ['processed_at']
+        model = RAGEmbedding
+        fields = ['id', 'document', 'document_name', 'chunk_index', 'chunk_text', 
+                 'embedding', 'metadata', 'created_at']
+        read_only_fields = ['id', 'created_at']
+
+
+class RAGEmbeddingJobSerializer(serializers.ModelSerializer):
+    document_name = serializers.CharField(source='document.file.filename', read_only=True)
+    
+    class Meta:
+        model = RAGEmbeddingJob
+        fields = ['id', 'document', 'document_name', 'status', 'message', 
+                 'created_at', 'updated_at', 'completed_at', 'retry_count']
+        read_only_fields = ['id', 'created_at', 'updated_at']
+
+
+class EmbeddingCreateSerializer(serializers.Serializer):
+    document_id = serializers.UUIDField()
+    cancer_type_id = serializers.IntegerField()
+    chunk_index = serializers.IntegerField()
+    chunk_text = serializers.CharField()
+    embedding = serializers.ListField(
+        child=serializers.FloatField(),
+        min_length=1536,
+        max_length=1536
+    )
+    metadata = serializers.JSONField(required=False, default=dict)
+
+
+class BulkEmbeddingCreateSerializer(serializers.Serializer):
+    document_id = serializers.UUIDField()
+    chunks = serializers.ListField(
+        child=EmbeddingCreateSerializer(),
+        allow_empty=False
+    )
+
+
+class EmbeddingSearchSerializer(serializers.Serializer):
+    query_embedding = serializers.ListField(
+        child=serializers.FloatField(),
+        min_length=1536,
+        max_length=1536
+    )
+    cancer_type_id = serializers.IntegerField(required=False, allow_null=True)
+    k = serializers.IntegerField(default=5, min_value=1, max_value=50)
+
+
+class PatientAssignmentSerializer(serializers.ModelSerializer):
+    cancer_subtype_detail = serializers.SerializerMethodField()
+    assigned_clinician_detail = serializers.SerializerMethodField()
+    updated_by_detail = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = PatientAssignment
+        fields = '__all__'
+        read_only_fields = ['created_at', 'updated_at']
+    
+    def get_cancer_subtype_detail(self, obj):
+        if obj.cancer_subtype:
+            return {
+                'id': obj.cancer_subtype.id,
+                'cancer_type': obj.cancer_subtype.cancer_type,
+                'parent': obj.cancer_subtype.parent.cancer_type if obj.cancer_subtype.parent else None
+            }
+        return None
+    
+    def get_assigned_clinician_detail(self, obj):
+        if obj.assigned_clinician:
+            return {
+                'id': obj.assigned_clinician.id,
+                'name': f"Dr. {obj.assigned_clinician.user.first_name} {obj.assigned_clinician.user.last_name}",
+                'specialization': obj.assigned_clinician.specialization.cancer_type if obj.assigned_clinician.specialization else None
+            }
+        return None
+    
+    def get_updated_by_detail(self, obj):
+        if obj.updated_by:
+            return {
+                'id': obj.updated_by.id,
+                'name': f"{obj.updated_by.first_name} {obj.updated_by.last_name}",
+                'email': obj.updated_by.email
+            }
+        return None
+
+
+class MedicalRecordTypeSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = MedicalRecordType
+        fields = ['id', 'type_name', 'is_active', 'created_at']
+        read_only_fields = ['created_at']
+
+
+class MedicalRecordSerializer(serializers.ModelSerializer):
+    file_detail = FileMetadataSerializer(source='file', read_only=True)
+    patient_detail = serializers.SerializerMethodField()
+    medical_record_type_detail = MedicalRecordTypeSerializer(source='medical_record_type', read_only=True)
+    uploaded_by_detail = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = MedicalRecord
+        fields = ['file', 'patient', 'medical_record_type', 'uploaded_by', 'created_at', 
+                  'file_detail', 'patient_detail', 'medical_record_type_detail', 'uploaded_by_detail']
+        read_only_fields = ['created_at', 'file_detail', 'patient_detail', 'medical_record_type_detail', 'uploaded_by_detail']
+    
+    def get_patient_detail(self, obj):
+        """Get basic patient info"""
+        return {
+            'id': obj.patient.id,
+            'name': f"{obj.patient.user.first_name} {obj.patient.user.last_name}" if hasattr(obj.patient, 'user') else 'Unknown'
+        }
+    
+    def get_uploaded_by_detail(self, obj):
+        """Get uploader info"""
+        if obj.uploaded_by:
+            return {
+                'id': obj.uploaded_by.id,
+                'name': f"{obj.uploaded_by.first_name} {obj.uploaded_by.last_name}",
+                'email': obj.uploaded_by.email
+            }
+        return None
+
+
+class MedicalRecordAccessSerializer(serializers.ModelSerializer):
+    user_detail = UserSerializer(source='user', read_only=True)
+    granted_by_detail = UserSerializer(source='granted_by', read_only=True)
+    
+    class Meta:
+        model = MedicalRecordAccess
+        fields = ['id', 'medical_record', 'user', 'encrypted_access_key', 'granted_by', 'granted_at', 
+                  'expires_at', 'revoked_at', 'is_active', 'user_detail', 'granted_by_detail']
+        read_only_fields = ['granted_at', 'is_active', 'user_detail', 'granted_by_detail']

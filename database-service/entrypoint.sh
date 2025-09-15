@@ -12,12 +12,13 @@ echo "PostgreSQL started"
 echo "Waiting for auth-service to initialize..."
 sleep 10
 
-# Run migrations in the correct order
+# Enable PGVector extension
+echo "Enabling PGVector extension..."
+python manage.py enable_pgvector
+
+# Run migrations
 echo "Running database migrations..."
-# First ensure data_management initial migration is applied
-python manage.py migrate data_management 0001_initial --fake-initial --noinput || true
-# Then run all remaining migrations
-python manage.py migrate --noinput || true
+python manage.py migrate --noinput
 
 # Create admin user if it doesn't exist
 echo "Creating admin user..."

@@ -1,95 +1,128 @@
-/**
- * Activity-based token refresh handler
- * Include this script in all pages that need JWT token refresh based on user activity
- */
-(function() {
-    'use strict';
-    
-    let refreshTimer = null;
-    const REFRESH_INTERVAL = 8 * 60 * 1000; // 8 minutes - check for refresh
-    const ACTIVITY_EVENTS = ['mousedown', 'keydown', 'scroll', 'touchstart', 'click', 'mousemove'];
-    let lastActivity = Date.now();
-    
-    // Track user activity
-    function updateActivity() {
-        lastActivity = Date.now();
+// Token refresh functionality
+const TOKEN_REFRESH_INTERVAL = 14 * 60 * 1000; // 14 minutes
+
+function getAccessToken() {
+    return localStorage.getItem('access_token');
+}
+
+function getRefreshToken() {
+    return localStorage.getItem('refresh_token');
+}
+
+function setTokens(access, refresh) {
+    localStorage.setItem('access_token', access);
+    if (refresh) {
+        localStorage.setItem('refresh_token', refresh);
     }
-    
-    // Add activity listeners
-    ACTIVITY_EVENTS.forEach(event => {
-        document.addEventListener(event, updateActivity, { passive: true, capture: true });
-    });
-    
-    // Function to refresh token
-    async function attemptTokenRefresh() {
-        try {
-            const response = await fetch('/api/auth/refresh-if-active/', {
-                method: 'POST',
-                credentials: 'include', // Include cookies
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-Requested-With': 'XMLHttpRequest'
-                }
-            });
-            
+    // Set cookie for server-side rendering
+    document.cookie = `access_token=${access}; path=/; max-age=900`;
+}
+
+function clearTokens() {
+    localStorage.removeItem('access_token');
+    localStorage.removeItem('refresh_token');
+    document.cookie = 'access_token=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT;';
+}
+
+async function refreshAccessToken() {
+    const refreshToken = getRefreshToken();
+    if (!refreshToken) {
+        window.location.href = '/login/';
+        return false;
+    }
+
+    try {
+        const response = await fetch('/api/clinician/auth/refresh/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ refresh: refreshToken })
+        });
+
+        if (response.ok) {
             const data = await response.json();
-            
-            if (response.ok && data.refreshed) {
-                console.log('Token refreshed successfully');
-                // Update any auth headers if your app uses them
-                if (window.updateAuthHeaders && typeof window.updateAuthHeaders === 'function') {
-                    window.updateAuthHeaders(data.access_token);
-                }
-            } else if (response.status === 401) {
-                console.warn('Token expired or invalid, redirecting to login');
-                // Clear any stored auth data
-                window.location.href = '/login?expired=true';
-            }
-            
-            return response.ok;
-        } catch (error) {
-            console.error('Error refreshing token:', error);
+            setTokens(data.access);
+            return true;
+        } else {
+            clearTokens();
+            window.location.href = '/login/';
             return false;
         }
+    } catch (error) {
+        console.error('Token refresh failed:', error);
+        return false;
+    }
+}
+
+// Check if user is active and refresh if needed
+async function refreshIfActive() {
+    const accessToken = getAccessToken();
+    if (!accessToken) {
+        return false;
+    }
+
+    try {
+        const response = await fetch('/api/clinician/auth/refresh-if-active/', {
+            method: 'POST',
+            credentials: 'include', // Include cookies
+            headers: {
+                'Authorization': `Bearer ${accessToken}`,
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        });
+        
+        const data = await response.json();
+        
+        if (data.active) {
+            if (data.needs_refresh && data.access) {
+                setTokens(data.access);
+            }
+            return true;
+        } else {
+            clearTokens();
+            window.location.href = '/login/';
+            return false;
+        }
+    } catch (error) {
+        console.error('Activity check failed:', error);
+        return false;
+    }
+}
+
+// Set up automatic token refresh
+let refreshInterval;
+
+function startTokenRefresh() {
+    // Clear any existing interval
+    if (refreshInterval) {
+        clearInterval(refreshInterval);
     }
     
-    // Check and refresh token periodically
-    function startTokenRefresh() {
-        // Clear any existing timer
-        if (refreshTimer) {
-            clearInterval(refreshTimer);
-        }
-        
-        // Set up periodic refresh check
-        refreshTimer = setInterval(() => {
-            const timeSinceActivity = Date.now() - lastActivity;
-            
-            // Only refresh if user has been active in the last 15 minutes
-            if (timeSinceActivity < 15 * 60 * 1000) {
-                attemptTokenRefresh();
-            } else {
-                console.log('User inactive for >15 minutes, skipping token refresh');
-            }
-        }, REFRESH_INTERVAL);
-        
-        // Also attempt an initial refresh after 8 minutes
-        setTimeout(() => {
-            if (Date.now() - lastActivity < 15 * 60 * 1000) {
-                attemptTokenRefresh();
-            }
-        }, REFRESH_INTERVAL);
+    // Set up new interval
+    refreshInterval = setInterval(() => {
+        refreshIfActive();
+    }, TOKEN_REFRESH_INTERVAL);
+}
+
+// Initialize on page load
+document.addEventListener('DOMContentLoaded', function() {
+    const accessToken = getAccessToken();
+    if (accessToken) {
+        // Set cookie for server-side rendering
+        document.cookie = `access_token=${accessToken}; path=/; max-age=900`;
+        startTokenRefresh();
     }
-    
-    // Start the refresh cycle
-    startTokenRefresh();
-    
-    // Clean up on page unload
-    window.addEventListener('beforeunload', () => {
-        if (refreshTimer) {
-            clearInterval(refreshTimer);
-        }
-    });
-    
-    // Expose refresh function globally if needed
-    window.refreshAuthToken = attemptTokenRefresh;
-})();
+});
+
+// Export functions for use in other scripts
+window.tokenUtils = {
+    getAccessToken,
+    getRefreshToken,
+    setTokens,
+    clearTokens,
+    refreshAccessToken,
+    refreshIfActive,
+    startTokenRefresh
+};

@@ -1,19 +1,21 @@
-from rest_framework import viewsets, status
+from rest_framework import viewsets, status, filters
 from rest_framework.decorators import action, api_view
 from rest_framework.response import Response
 from rest_framework.pagination import PageNumberPagination
+from django_filters.rest_framework import DjangoFilterBackend
 from django.core.cache import cache
 from django.conf import settings
 from django.db.models import Q
 from django.utils import timezone
 from datetime import datetime, timedelta
-from .models import User, Role, Patient, Appointment, MedicalRecord, Prescription, EventLog, CancerType, UserEncryptionKey, FileMetadata, FileAccessLog, RAGDocument, RefreshToken, Language, DocumentEmbedding, EmbeddingChunk
+from .models import User, Role, Patient, Clinician, EventLog, CancerType, UserEncryptionKey, FileMetadata, FileAccessLog, RAGDocument, RefreshToken, Language, RAGEmbedding, RAGEmbeddingJob, PatientAssignment, MedicalRecordType, MedicalRecord, MedicalRecordAccess
 from .serializers import (
-    UserSerializer, PatientSerializer,
-    AppointmentSerializer, MedicalRecordSerializer, PrescriptionSerializer,
-    EventLogSerializer, MedicalRecordCreateSerializer, CancerTypeSerializer,
+    UserSerializer, PatientSerializer, ClinicianSerializer,
+    EventLogSerializer, CancerTypeSerializer,
     FileMetadataSerializer, RAGDocumentSerializer, LanguageSerializer,
-    DocumentEmbeddingSerializer, EmbeddingChunkSerializer
+    RAGEmbeddingSerializer, RAGEmbeddingJobSerializer, EmbeddingCreateSerializer,
+    BulkEmbeddingCreateSerializer, EmbeddingSearchSerializer, PatientAssignmentSerializer,
+    MedicalRecordTypeSerializer, MedicalRecordSerializer, MedicalRecordAccessSerializer
 )
 
 
@@ -173,166 +175,106 @@ class PatientViewSet(viewsets.ModelViewSet):
             return Response(serializer.data)
         except Patient.DoesNotExist:
             return Response({'error': 'Patient not found'}, status=status.HTTP_404_NOT_FOUND)
-
-# class ClinicianViewSet(viewsets.ModelViewSet):
-#     queryset = Clinician.objects.select_related('user').all()
-#     serializer_class = ClinicianSerializer
-#     
-#     @action(detail=False, methods=['get'])
-#     def available(self, request):
-#         clinicians = self.queryset.filter(is_available=True)
-#         serializer = self.get_serializer(clinicians, many=True)
-#         return Response(serializer.data)
-#     
-#     @action(detail=False, methods=['get'])
-#     def by_specialization(self, request):
-#         specialization = request.query_params.get('specialization')
-#         if not specialization:
-#             return Response({'error': 'specialization parameter required'}, status=status.HTTP_400_BAD_REQUEST)
-#         
-#         clinicians = self.queryset.filter(specialization__icontains=specialization)
-#         serializer = self.get_serializer(clinicians, many=True)
-#         return Response(serializer.data)
-
-class AppointmentViewSet(viewsets.ModelViewSet):
-    queryset = Appointment.objects.select_related('patient').all()
-    serializer_class = AppointmentSerializer
     
-    def get_queryset(self):
-        queryset = super().get_queryset()
+    @action(detail=False, methods=['get'])
+    def by_clinician(self, request):
+        """Get all patients assigned to a specific clinician"""
+        clinician_id = request.query_params.get('clinician_id')
+        if not clinician_id:
+            return Response({'error': 'clinician_id parameter required'}, status=status.HTTP_400_BAD_REQUEST)
         
-        # Filter by patient
-        patient_id = self.request.query_params.get('patient_id')
-        if patient_id:
-            queryset = queryset.filter(patient_id=patient_id)
+        try:
+            # Get patients through PatientAssignment
+            patients = Patient.objects.filter(
+                assignment__assigned_clinician_id=clinician_id
+            ).select_related('preferred_language', 'assignment', 'assignment__cancer_subtype')
+            
+            # Get user data for each patient
+            patient_data = []
+            for patient in patients:
+                patient_dict = self.get_serializer(patient).data
+                # Fetch user data separately
+                try:
+                    user = User.objects.get(id=patient.user_id)
+                    patient_dict['user'] = UserSerializer(user).data
+                except User.DoesNotExist:
+                    patient_dict['user'] = None
+                patient_data.append(patient_dict)
+            
+            return Response(patient_data)
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+class ClinicianViewSet(viewsets.ModelViewSet):
+    queryset = Clinician.objects.select_related('user', 'specialization').all()
+    serializer_class = ClinicianSerializer
+    
+    def create(self, request, *args, **kwargs):
+        """Create a new clinician profile"""
+        user_id = request.data.get('user_id')
+        specialization_id = request.data.get('specialization_id')
+        phone_number = request.data.get('phone_number', '')
         
-        # Filter by clinician
-        clinician_id = self.request.query_params.get('clinician_id')
-        if clinician_id:
-            queryset = queryset.filter(clinician_id=clinician_id)
-        
-        # Filter by date range
-        start_date = self.request.query_params.get('start_date')
-        end_date = self.request.query_params.get('end_date')
-        if start_date and end_date:
-            queryset = queryset.filter(
-                appointment_date__gte=start_date,
-                appointment_date__lte=end_date
+        if not user_id:
+            return Response(
+                {'error': 'user_id is required'}, 
+                status=status.HTTP_400_BAD_REQUEST
             )
         
-        # Filter by status
-        status_filter = self.request.query_params.get('status')
-        if status_filter:
-            queryset = queryset.filter(status=status_filter)
-        
-        return queryset.order_by('appointment_date')
-    
-    @action(detail=False, methods=['get'])
-    def upcoming(self, request):
-        # Cache key based on query params
-        patient_id = request.query_params.get('patient_id')
-        clinician_id = request.query_params.get('clinician_id')
-        cache_key = f"upcoming_appointments_{patient_id}_{clinician_id}"
-        
-        cached_data = cache.get(cache_key)
-        if cached_data:
-            return Response(cached_data)
-        
-        queryset = self.queryset.filter(
-            appointment_date__gte=timezone.now(),
-            status__in=['SCHEDULED', 'CONFIRMED']
-        )
-        
-        if patient_id:
-            queryset = queryset.filter(patient_id=patient_id)
-        if clinician_id:
-            queryset = queryset.filter(clinician_id=clinician_id)
-        
-        appointments = queryset.order_by('appointment_date')[:20]
-        serializer = self.get_serializer(appointments, many=True)
-        
-        cache.set(cache_key, serializer.data, 300)  # Cache for 5 minutes
-        return Response(serializer.data)
-
-class MedicalRecordViewSet(viewsets.ModelViewSet):
-    queryset = MedicalRecord.objects.select_related('patient', 'appointment').all()
-    serializer_class = MedicalRecordSerializer
-    
-    def get_queryset(self):
-        queryset = super().get_queryset()
-        
-        # Filter by patient
-        patient_id = self.request.query_params.get('patient_id')
-        if patient_id:
-            queryset = queryset.filter(patient_id=patient_id)
-        
-        # Filter by record type
-        record_type = self.request.query_params.get('record_type')
-        if record_type:
-            queryset = queryset.filter(record_type=record_type)
-        
-        return queryset.order_by('-created_at')
-    
-    @action(detail=False, methods=['post'])
-    def create_from_service(self, request):
-        serializer = MedicalRecordCreateSerializer(data=request.data)
-        if serializer.is_valid():
-            data = serializer.validated_data
+        try:
+            # Get user
+            user = User.objects.get(id=user_id)
             
-            try:
-                patient = Patient.objects.get(user_id=data['patient_id'])
-                
-                medical_record = MedicalRecord.objects.create(
-                    patient=patient,
-                    clinician_id=data['clinician_id'],
-                    clinician_name=data.get('clinician_name', ''),
-                    record_type=data['record_type'],
-                    title=data['title'],
-                    description=data['description'],
-                    diagnosis=data.get('diagnosis', ''),
-                    treatment=data.get('treatment', '')
-                )
-                
-                response_serializer = MedicalRecordSerializer(medical_record)
-                return Response(response_serializer.data, status=status.HTTP_201_CREATED)
-                
-            except Patient.DoesNotExist as e:
-                return Response({'error': str(e)}, status=status.HTTP_404_NOT_FOUND)
-        
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-class PrescriptionViewSet(viewsets.ModelViewSet):
-    queryset = Prescription.objects.select_related('patient', 'medical_record').all()
-    serializer_class = PrescriptionSerializer
-    
-    def get_queryset(self):
-        queryset = super().get_queryset()
-        
-        # Filter by patient
-        patient_id = self.request.query_params.get('patient_id')
-        if patient_id:
-            queryset = queryset.filter(patient_id=patient_id)
-        
-        # Filter by active status
-        is_active = self.request.query_params.get('is_active')
-        if is_active is not None:
-            queryset = queryset.filter(is_active=is_active.lower() == 'true')
-        
-        return queryset.order_by('-created_at')
+            # Get specialization if provided
+            specialization = None
+            if specialization_id:
+                specialization = CancerType.objects.get(id=specialization_id, parent__isnull=True)
+            
+            # Create clinician
+            clinician = Clinician.objects.create(
+                user=user,
+                specialization=specialization,
+                phone_number=phone_number,
+                is_available=True
+            )
+            
+            serializer = self.get_serializer(clinician)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+            
+        except User.DoesNotExist:
+            return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
+        except CancerType.DoesNotExist:
+            return Response({'error': 'Invalid specialization'}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
     
     @action(detail=False, methods=['get'])
-    def active_by_patient(self, request):
-        patient_id = request.query_params.get('patient_id')
-        if not patient_id:
-            return Response({'error': 'patient_id parameter required'}, status=status.HTTP_400_BAD_REQUEST)
+    def by_user(self, request):
+        user_id = request.query_params.get('user_id')
+        if not user_id:
+            return Response({'error': 'user_id parameter required'}, status=status.HTTP_400_BAD_REQUEST)
         
-        prescriptions = self.queryset.filter(
-            patient_id=patient_id,
-            is_active=True,
-            end_date__gte=timezone.now().date()
-        )
+        try:
+            clinician = Clinician.objects.select_related('user', 'specialization').get(user__id=user_id)
+            serializer = self.get_serializer(clinician)
+            return Response(serializer.data)
+        except Clinician.DoesNotExist:
+            return Response({'error': 'Clinician not found'}, status=status.HTTP_404_NOT_FOUND)
+    
+    @action(detail=False, methods=['get'])
+    def available(self, request):
+        clinicians = self.queryset.filter(is_available=True)
+        serializer = self.get_serializer(clinicians, many=True)
+        return Response(serializer.data)
+    
+    @action(detail=False, methods=['get'])
+    def by_specialization(self, request):
+        specialization_id = request.query_params.get('specialization_id')
+        if not specialization_id:
+            return Response({'error': 'specialization_id parameter required'}, status=status.HTTP_400_BAD_REQUEST)
         
-        serializer = self.get_serializer(prescriptions, many=True)
+        clinicians = self.queryset.filter(specialization__id=specialization_id)
+        serializer = self.get_serializer(clinicians, many=True)
         return Response(serializer.data)
 
 @api_view(['POST'])
@@ -355,16 +297,6 @@ def statistics(request):
         'total_users': User.objects.count(),
         'total_patients': Patient.objects.count(),
         'total_clinicians': User.objects.filter(role__name='CLINICIAN').count(),
-        'total_appointments': Appointment.objects.count(),
-        'upcoming_appointments': Appointment.objects.filter(
-            appointment_date__gte=timezone.now(),
-            status__in=['SCHEDULED', 'CONFIRMED']
-        ).count(),
-        'total_medical_records': MedicalRecord.objects.count(),
-        'active_prescriptions': Prescription.objects.filter(
-            is_active=True,
-            end_date__gte=timezone.now().date()
-        ).count(),
     }
     
     cache.set(cache_key, stats, 3600)  # Cache for 1 hour
@@ -808,222 +740,463 @@ class RefreshTokenViewSet(viewsets.ModelViewSet):
         })
 
 
-class DocumentEmbeddingViewSet(viewsets.ModelViewSet):
-    queryset = DocumentEmbedding.objects.select_related('file').all()
-    serializer_class = DocumentEmbeddingSerializer
+# RAG Embedding Views
+class RAGEmbeddingViewSet(viewsets.ModelViewSet):
+    queryset = RAGEmbedding.objects.all()
+    serializer_class = RAGEmbeddingSerializer
     
     def get_queryset(self):
         queryset = super().get_queryset()
         
-        # Filter by processing status
-        status = self.request.query_params.get('status')
-        if status:
-            queryset = queryset.filter(processing_status=status)
+        # Filter by document
+        document_id = self.request.query_params.get('document')
+        if document_id:
+            queryset = queryset.filter(document__file=document_id)
         
-        # Filter by embedding model
-        model = self.request.query_params.get('model')
-        if model:
-            queryset = queryset.filter(embedding_model=model)
-        
-        return queryset.order_by('-file__uploaded_at')
-    
-    @action(detail=False, methods=['get'])
-    def by_file(self, request):
-        """Get embedding by file ID"""
-        file_id = request.query_params.get('file_id')
-        if not file_id:
-            return Response({'error': 'file_id parameter required'}, status=status.HTTP_400_BAD_REQUEST)
-        
-        try:
-            embedding = DocumentEmbedding.objects.select_related('file').get(file_id=file_id)
-            serializer = self.get_serializer(embedding)
-            return Response(serializer.data)
-        except DocumentEmbedding.DoesNotExist:
-            return Response({'error': 'Embedding not found'}, status=status.HTTP_404_NOT_FOUND)
+        return queryset
     
     @action(detail=False, methods=['post'])
     def create_embedding(self, request):
-        """Create a new document embedding record"""
-        file_id = request.data.get('file_id')
-        model = request.data.get('embedding_model', 'text-embedding-ada-002')
+        """Create a single embedding"""
+        serializer = EmbeddingCreateSerializer(data=request.data)
+        if serializer.is_valid():
+            try:
+                # Get document
+                document = RAGDocument.objects.get(file_id=serializer.validated_data['document_id'])
+                
+                # Create embedding
+                embedding = RAGEmbedding.objects.create(
+                    document=document,
+                    chunk_index=serializer.validated_data['chunk_index'],
+                    chunk_text=serializer.validated_data['chunk_text'],
+                    embedding=serializer.validated_data['embedding'],
+                    metadata=serializer.validated_data.get('metadata', {})
+                )
+                
+                # Also store in vector column
+                from django.db import connection
+                with connection.cursor() as cursor:
+                    cursor.execute(
+                        "UPDATE rag_embeddings SET embedding_vector = %s WHERE id = %s",
+                        [serializer.validated_data['embedding'], str(embedding.id)]
+                    )
+                
+                return Response(
+                    RAGEmbeddingSerializer(embedding).data,
+                    status=status.HTTP_201_CREATED
+                )
+            except RAGDocument.DoesNotExist:
+                return Response(
+                    {'error': 'Document not found'},
+                    status=status.HTTP_404_NOT_FOUND
+                )
+            except Exception as e:
+                return Response(
+                    {'error': str(e)},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                )
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+    @action(detail=False, methods=['post'])
+    def bulk_create(self, request):
+        """Create multiple embeddings at once"""
+        serializer = BulkEmbeddingCreateSerializer(data=request.data)
+        if serializer.is_valid():
+            try:
+                document_id = serializer.validated_data['document_id']
+                document = RAGDocument.objects.get(file_id=document_id)
+                
+                created_embeddings = []
+                for chunk_data in serializer.validated_data['chunks']:
+                    embedding = RAGEmbedding.objects.create(
+                        document=document,
+                        chunk_index=chunk_data['chunk_index'],
+                        chunk_text=chunk_data['chunk_text'],
+                        embedding=chunk_data['embedding'],
+                        metadata=chunk_data.get('metadata', {})
+                    )
+                    created_embeddings.append(embedding)
+                
+                # Bulk update vector column
+                from django.db import connection
+                with connection.cursor() as cursor:
+                    for i, embedding in enumerate(created_embeddings):
+                        cursor.execute(
+                            "UPDATE rag_embeddings SET embedding_vector = %s WHERE id = %s",
+                            [serializer.validated_data['chunks'][i]['embedding'], str(embedding.id)]
+                        )
+                
+                return Response({
+                    'message': f'Created {len(created_embeddings)} embeddings',
+                    'count': len(created_embeddings)
+                }, status=status.HTTP_201_CREATED)
+                
+            except RAGDocument.DoesNotExist:
+                return Response(
+                    {'error': 'Document not found'},
+                    status=status.HTTP_404_NOT_FOUND
+                )
+            except Exception as e:
+                return Response(
+                    {'error': str(e)},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                )
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+    @action(detail=False, methods=['post'])
+    def search(self, request):
+        """Search for similar embeddings using vector similarity"""
+        serializer = EmbeddingSearchSerializer(data=request.data)
+        if serializer.is_valid():
+            try:
+                query_embedding = serializer.validated_data['query_embedding']
+                cancer_type_id = serializer.validated_data.get('cancer_type_id')
+                k = serializer.validated_data['k']
+                
+                # Build query with PGVector
+                from django.db import connection
+                
+                if cancer_type_id:
+                    query = """
+                        SELECT e.id, e.chunk_text, e.metadata, 
+                               e.embedding_vector <=> %s::vector as distance,
+                               d.file_id, f.filename
+                        FROM rag_embeddings e
+                        JOIN rag_documents d ON e.document_id = d.file_id
+                        JOIN file_metadata f ON d.file_id = f.id
+                        WHERE d.cancer_type_id = %s
+                        ORDER BY e.embedding_vector <=> %s::vector
+                        LIMIT %s
+                    """
+                    params = [query_embedding, cancer_type_id, query_embedding, k]
+                else:
+                    query = """
+                        SELECT e.id, e.chunk_text, e.metadata, 
+                               e.embedding_vector <=> %s::vector as distance,
+                               d.file_id, f.filename
+                        FROM rag_embeddings e
+                        JOIN rag_documents d ON e.document_id = d.file_id
+                        JOIN file_metadata f ON d.file_id = f.id
+                        ORDER BY e.embedding_vector <=> %s::vector
+                        LIMIT %s
+                    """
+                    params = [query_embedding, query_embedding, k]
+                
+                with connection.cursor() as cursor:
+                    cursor.execute(query, params)
+                    results = []
+                    for row in cursor.fetchall():
+                        results.append({
+                            'id': str(row[0]),
+                            'chunk_text': row[1],
+                            'metadata': row[2],
+                            'distance': float(row[3]),
+                            'document_id': str(row[4]),
+                            'document_name': row[5]
+                        })
+                
+                return Response({
+                    'results': results,
+                    'count': len(results)
+                })
+                
+            except Exception as e:
+                return Response(
+                    {'error': str(e)},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                )
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+    @action(detail=False, methods=['get'])
+    def has_embeddings(self, request):
+        """Check if a document has embeddings"""
+        document_id = request.query_params.get('document_id')
+        if not document_id:
+            return Response(
+                {'error': 'document_id parameter required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
         
-        if not file_id:
-            return Response({'error': 'file_id is required'}, status=status.HTTP_400_BAD_REQUEST)
+        exists = RAGEmbedding.objects.filter(document__file=document_id).exists()
+        return Response({'has_embeddings': exists})
+
+
+class RAGEmbeddingJobViewSet(viewsets.ModelViewSet):
+    queryset = RAGEmbeddingJob.objects.all()
+    serializer_class = RAGEmbeddingJobSerializer
+    filter_backends = [DjangoFilterBackend, filters.OrderingFilter]
+    filterset_fields = ['document', 'status', 'id']
+    ordering_fields = ['created_at', 'updated_at']
+    ordering = ['-created_at']
+    
+    @action(detail=False, methods=['post'])
+    def create_status(self, request):
+        """Create initial job status"""
+        job_id = request.data.get('job_id')
+        document_id = request.data.get('document_id')
+        status_value = request.data.get('status', 'pending')
+        message = request.data.get('message', '')
+        
+        if not all([job_id, document_id]):
+            return Response(
+                {'error': 'job_id and document_id are required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
         
         try:
-            file_metadata = FileMetadata.objects.get(id=file_id)
-            
-            # Check if embedding already exists
-            if DocumentEmbedding.objects.filter(file=file_metadata).exists():
-                return Response({'error': 'Embedding already exists for this file'}, status=status.HTTP_409_CONFLICT)
-            
-            embedding = DocumentEmbedding.objects.create(
-                file=file_metadata,
-                total_chunks=0,
-                embedding_model=model,
-                processing_status='queued'
+            document = RAGDocument.objects.get(file_id=document_id)
+            job = RAGEmbeddingJob.objects.create(
+                id=job_id,
+                document=document,
+                status=status_value,
+                message=message
             )
             
-            serializer = self.get_serializer(embedding)
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-            
-        except FileMetadata.DoesNotExist:
-            return Response({'error': 'File not found'}, status=status.HTTP_404_NOT_FOUND)
-        except Exception as e:
-            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response(
+                RAGEmbeddingJobSerializer(job).data,
+                status=status.HTTP_201_CREATED
+            )
+        except RAGDocument.DoesNotExist:
+            return Response(
+                {'error': 'Document not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
     
-    @action(detail=True, methods=['patch'])
+    @action(detail=True, methods=['put'])
     def update_status(self, request, pk=None):
-        """Update embedding processing status"""
-        embedding = self.get_object()
+        """Update job status"""
+        try:
+            job = RAGEmbeddingJob.objects.get(id=pk)
+            job.status = request.data.get('status', job.status)
+            job.message = request.data.get('message', job.message)
+            
+            if job.status == 'completed':
+                job.completed_at = timezone.now()
+            
+            job.save()
+            
+            return Response(RAGEmbeddingJobSerializer(job).data)
+            
+        except RAGEmbeddingJob.DoesNotExist:
+            return Response(
+                {'error': 'Job not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+    
+    @action(detail=False, methods=['get'])
+    def statistics(self, request):
+        """Get embedding job statistics"""
+        from django.db.models import Count
         
-        new_status = request.data.get('status')
-        if new_status not in ['queued', 'processing', 'completed', 'failed']:
-            return Response({'error': 'Invalid status'}, status=status.HTTP_400_BAD_REQUEST)
+        stats = RAGEmbeddingJob.objects.values('status').annotate(count=Count('status'))
         
-        embedding.processing_status = new_status
+        total_processed = RAGEmbedding.objects.values('document').distinct().count()
         
-        if new_status == 'completed':
-            embedding.processed_at = timezone.now()
-            embedding.error_message = None
-        elif new_status == 'failed':
-            embedding.error_message = request.data.get('error_message', 'Unknown error')
+        return Response({
+            'job_stats': list(stats),
+            'total_documents_processed': total_processed,
+            'total_embeddings': RAGEmbedding.objects.count()
+        })
+
+
+# Old embedding code - to be removed
+@api_view(['GET'])
+def check_document_embeddings(request, document_id):
+    """Check if document has embeddings"""
+    has_embeddings = RAGEmbedding.objects.filter(document_id=document_id).exists()
+    return Response({'has_embeddings': has_embeddings})
+
+
+class PatientAssignmentViewSet(viewsets.ModelViewSet):
+    queryset = PatientAssignment.objects.select_related('patient', 'cancer_subtype', 'assigned_clinician', 'updated_by').all()
+    serializer_class = PatientAssignmentSerializer
+    
+    @action(detail=False, methods=['get'])
+    def by_patient(self, request):
+        """Get assignment by patient ID"""
+        patient_id = request.query_params.get('patient_id')
+        if not patient_id:
+            return Response({'error': 'patient_id parameter required'}, status=status.HTTP_400_BAD_REQUEST)
         
-        if 'total_chunks' in request.data:
-            embedding.total_chunks = request.data['total_chunks']
+        try:
+            assignment = PatientAssignment.objects.select_related(
+                'patient', 'cancer_subtype', 'assigned_clinician', 'updated_by'
+            ).get(patient_id=patient_id)
+            serializer = self.get_serializer(assignment)
+            return Response(serializer.data)
+        except PatientAssignment.DoesNotExist:
+            return Response({'error': 'Assignment not found'}, status=status.HTTP_404_NOT_FOUND)
+    
+    def create(self, request, *args, **kwargs):
+        """Create or update patient assignment"""
+        patient_id = request.data.get('patient')
+        if not patient_id:
+            return Response({'error': 'patient is required'}, status=status.HTTP_400_BAD_REQUEST)
         
-        embedding.save()
+        # Check if assignment already exists
+        try:
+            assignment = PatientAssignment.objects.get(patient_id=patient_id)
+            # Update existing assignment
+            serializer = self.get_serializer(assignment, data=request.data, partial=True)
+        except PatientAssignment.DoesNotExist:
+            # Create new assignment
+            serializer = self.get_serializer(data=request.data)
         
-        serializer = self.get_serializer(embedding)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+    def update(self, request, *args, **kwargs):
+        """Update patient assignment"""
+        partial = kwargs.pop('partial', False)
+        instance = self.get_object()
+        
+        # Set updated_by to the requesting user (if available)
+        if 'updated_by' not in request.data and hasattr(request, 'user'):
+            request.data['updated_by'] = request.user.id
+        
+        serializer = self.get_serializer(instance, data=request.data, partial=partial)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+        
         return Response(serializer.data)
     
     @action(detail=False, methods=['get'])
-    def pending_embeddings(self, request):
-        """Get all files that need embedding processing"""
-        # Get files that don't have embeddings yet
-        files_without_embeddings = FileMetadata.objects.filter(
-            is_deleted=False,
-            embedding__isnull=True
-        ).values_list('id', flat=True)
+    def check_assignment(self, request):
+        """Check if a clinician is assigned to a patient"""
+        patient_id = request.query_params.get('patient_id')
+        clinician_user_id = request.query_params.get('clinician_user_id')
         
-        # Get files with failed embeddings that can be retried
-        failed_embeddings = DocumentEmbedding.objects.filter(
-            processing_status='failed'
-        ).values_list('file_id', flat=True)
-        
-        # Combine the lists
-        all_file_ids = list(set(list(files_without_embeddings) + list(failed_embeddings)))
-        
-        # Get file metadata
-        files = FileMetadata.objects.filter(id__in=all_file_ids).order_by('-uploaded_at')
-        
-        data = [{
-            'file_id': str(file.id),
-            'filename': file.filename,
-            'mime_type': file.mime_type,
-            'file_size': file.file_size,
-            'uploaded_at': file.uploaded_at,
-            'has_failed_embedding': file.id in failed_embeddings
-        } for file in files]
-        
-        return Response(data)
-
-
-class EmbeddingChunkViewSet(viewsets.ModelViewSet):
-    queryset = EmbeddingChunk.objects.select_related('document_embedding', 'document_embedding__file').all()
-    serializer_class = EmbeddingChunkSerializer
-    
-    def get_queryset(self):
-        queryset = super().get_queryset()
-        
-        # Filter by document embedding
-        doc_embedding_id = self.request.query_params.get('document_embedding_id')
-        if doc_embedding_id:
-            queryset = queryset.filter(document_embedding__file_id=doc_embedding_id)
-        
-        # Filter by file
-        file_id = self.request.query_params.get('file_id')
-        if file_id:
-            queryset = queryset.filter(document_embedding__file_id=file_id)
-        
-        return queryset.order_by('chunk_index')
-    
-    @action(detail=False, methods=['post'])
-    def create_chunks(self, request):
-        """Create multiple embedding chunks at once"""
-        file_id = request.data.get('file_id')
-        chunks_data = request.data.get('chunks', [])
-        
-        if not file_id or not chunks_data:
-            return Response({'error': 'file_id and chunks are required'}, status=status.HTTP_400_BAD_REQUEST)
+        if not patient_id or not clinician_user_id:
+            return Response({'error': 'patient_id and clinician_user_id are required'}, status=status.HTTP_400_BAD_REQUEST)
         
         try:
-            # Get the document embedding
-            doc_embedding = DocumentEmbedding.objects.get(file_id=file_id)
+            # Get clinician by user ID
+            clinician = Clinician.objects.get(user_id=clinician_user_id)
             
-            # Create chunks
-            created_chunks = []
-            for chunk_data in chunks_data:
-                chunk = EmbeddingChunk.objects.create(
-                    document_embedding=doc_embedding,
-                    chunk_index=chunk_data['chunk_index'],
-                    chunk_text=chunk_data.get('chunk_text', ''),
-                    embedding_vector=chunk_data['embedding_vector'],
-                    vector_dimension=chunk_data['vector_dimension']
-                )
-                created_chunks.append(chunk)
-            
-            # Update total chunks count
-            doc_embedding.total_chunks = len(chunks_data)
-            doc_embedding.save()
-            
-            serializer = self.get_serializer(created_chunks, many=True)
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-            
-        except DocumentEmbedding.DoesNotExist:
-            return Response({'error': 'Document embedding not found'}, status=status.HTTP_404_NOT_FOUND)
-        except Exception as e:
-            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-    
-    @action(detail=False, methods=['post'])
-    def search_similar(self, request):
-        """Search for similar chunks using vector similarity"""
-        query_vector = request.data.get('query_vector')
-        cancer_type_id = request.data.get('cancer_type_id')
-        limit = request.data.get('limit', 10)
-        
-        if not query_vector:
-            return Response({'error': 'query_vector is required'}, status=status.HTTP_400_BAD_REQUEST)
-        
-        # This is a placeholder for vector similarity search
-        # In a real implementation, you would use a vector database like pgvector or a separate service
-        # For now, return a sample response structure
-        return Response({
-            'message': 'Vector similarity search not yet implemented',
-            'query_vector_dimension': len(query_vector) if isinstance(query_vector, list) else 0,
-            'cancer_type_id': cancer_type_id,
-            'limit': limit,
-            'results': []
-        })
-    
-    @action(detail=False, methods=['delete'])
-    def delete_by_file(self, request):
-        """Delete all chunks for a specific file"""
-        file_id = request.query_params.get('file_id')
-        if not file_id:
-            return Response({'error': 'file_id parameter required'}, status=status.HTTP_400_BAD_REQUEST)
-        
-        try:
-            # Delete all chunks for this file
-            count, _ = EmbeddingChunk.objects.filter(document_embedding__file_id=file_id).delete()
-            
-            # Delete the document embedding record
-            DocumentEmbedding.objects.filter(file_id=file_id).delete()
+            # Check if patient is assigned to this clinician
+            assignment_exists = PatientAssignment.objects.filter(
+                patient_id=patient_id,
+                assigned_clinician=clinician
+            ).exists()
             
             return Response({
-                'message': f'Deleted {count} chunks for file',
-                'file_id': file_id,
-                'chunks_deleted': count
+                'is_assigned': assignment_exists,
+                'patient_id': patient_id,
+                'clinician_id': clinician.id,
+                'clinician_user_id': clinician_user_id
+            })
+        except Clinician.DoesNotExist:
+            return Response({
+                'is_assigned': False,
+                'error': 'Clinician not found'
             })
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class MedicalRecordTypeViewSet(viewsets.ReadOnlyModelViewSet):
+    """
+    ViewSet for medical record types (read-only since these are predefined)
+    """
+    queryset = MedicalRecordType.objects.filter(is_active=True).order_by('type_name')
+    serializer_class = MedicalRecordTypeSerializer
+    
+    def list(self, request):
+        """List all active medical record types"""
+        types = self.get_queryset()
+        serializer = self.get_serializer(types, many=True)
+        return Response(serializer.data)
+
+
+class MedicalRecordViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet for medical records
+    """
+    queryset = MedicalRecord.objects.all()
+    serializer_class = MedicalRecordSerializer
+    filter_backends = [DjangoFilterBackend, filters.OrderingFilter]
+    filterset_fields = ['patient', 'medical_record_type']
+    ordering_fields = ['file__uploaded_at']
+    ordering = ['-file__uploaded_at']
+    
+    def get_queryset(self):
+        """Filter medical records by patient if specified"""
+        queryset = super().get_queryset()
+        patient_id = self.request.query_params.get('patient_id')
+        if patient_id:
+            queryset = queryset.filter(patient_id=patient_id)
+        return queryset.select_related('file', 'patient', 'medical_record_type')
+    
+    def create(self, request):
+        """Create a new medical record"""
+        serializer = self.get_serializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+    @action(detail=False, methods=['get'])
+    def by_patient(self, request):
+        """Get all medical records for a specific patient"""
+        patient_id = request.query_params.get('patient_id')
+        if not patient_id:
+            return Response({'error': 'patient_id is required'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        records = self.get_queryset().filter(patient_id=patient_id)
+        serializer = self.get_serializer(records, many=True)
+        return Response(serializer.data)
+
+
+class MedicalRecordAccessViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet for managing medical record access permissions
+    """
+    queryset = MedicalRecordAccess.objects.all()
+    serializer_class = MedicalRecordAccessSerializer
+    
+    def get_queryset(self):
+        """Filter access records"""
+        queryset = super().get_queryset()
+        
+        # Filter by medical record
+        medical_record_id = self.request.query_params.get('medical_record_id')
+        if medical_record_id:
+            queryset = queryset.filter(medical_record_id=medical_record_id)
+        
+        # Filter by user
+        user_id = self.request.query_params.get('user_id')
+        if user_id:
+            queryset = queryset.filter(user_id=user_id)
+        
+        # Filter only active access
+        if self.request.query_params.get('active_only', 'true').lower() == 'true':
+            queryset = queryset.filter(revoked_at__isnull=True)
+            # Also check expiry
+            now = timezone.now()
+            queryset = queryset.filter(
+                Q(expires_at__isnull=True) | Q(expires_at__gt=now)
+            )
+        
+        return queryset.select_related('medical_record', 'user', 'granted_by')
+    
+    def create(self, request):
+        """Grant access to a medical record"""
+        serializer = self.get_serializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+    @action(detail=True, methods=['post'])
+    def revoke(self, request, pk=None):
+        """Revoke access to a medical record"""
+        access = self.get_object()
+        access.revoked_at = timezone.now()
+        access.save()
+        
+        return Response({
+            'message': 'Access revoked successfully',
+            'revoked_at': access.revoked_at
+        })

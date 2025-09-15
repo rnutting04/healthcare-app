@@ -70,6 +70,22 @@ def register(request):
                 logger.error(f"Failed to create patient profile: {e}")
                 # Don't fail the registration if patient profile creation fails
         
+        # If the user is a clinician, create a clinician profile
+        elif role_name == 'clinician':
+            try:
+                from .services import DatabaseService
+                # Create clinician profile with minimal data
+                clinician_data = {
+                    'user_id': user['id'],
+                    'phone_number': '',  # Will be filled later
+                    # specialization_id is not included, will be null
+                }
+                DatabaseService.create_clinician_profile(clinician_data)
+                logger.info(f"Created clinician profile for user {user['id']}")
+            except Exception as e:
+                logger.error(f"Failed to create clinician profile: {e}")
+                # Don't fail the registration if clinician profile creation fails
+        
         response = Response({
             'user': UserSerializer(user).data,
             'access_token': access_token,

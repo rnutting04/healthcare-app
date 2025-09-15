@@ -126,6 +126,58 @@ class DatabaseService:
         return DatabaseService.make_request('PATCH', f'/api/patients/{patient_id}/', data=data)
     
     @staticmethod
+    def get_clinician_by_user(user_id):
+        """Get clinician data by user ID"""
+        return DatabaseService.make_request('GET', '/api/clinicians/by_user/', params={'user_id': user_id})
+    
+    @staticmethod
+    def update_clinician(clinician_id, data):
+        """Update clinician information"""
+        return DatabaseService.make_request('PATCH', f'/api/clinicians/{clinician_id}/', data=data)
+    
+    @staticmethod
+    def get_patient_assignment(patient_id):
+        """Get patient assignment by patient ID"""
+        try:
+            return DatabaseService.make_request('GET', '/api/patient-assignments/by_patient/', params={'patient_id': patient_id})
+        except Exception as e:
+            logger.warning(f"No assignment found for patient {patient_id}: {str(e)}")
+            return None
+    
+    @staticmethod
+    def create_or_update_patient_assignment(data):
+        """Create or update patient assignment"""
+        return DatabaseService.make_request('POST', '/api/patient-assignments/', data=data)
+    
+    @staticmethod
+    def get_cancer_subtypes(parent_id=None):
+        """Get cancer subtypes, optionally filtered by parent"""
+        params = {}
+        if parent_id:
+            params['parent'] = parent_id
+        response = DatabaseService.make_request('GET', '/api/cancer-types/', params=params)
+        # Filter to only subtypes (those with parent)
+        if isinstance(response, list):
+            return [ct for ct in response if ct.get('parent') is not None]
+        elif isinstance(response, dict) and 'results' in response:
+            return [ct for ct in response['results'] if ct.get('parent') is not None]
+        return []
+    
+    @staticmethod
+    def get_available_clinicians():
+        """Get all active clinicians"""
+        try:
+            response = DatabaseService.make_request('GET', '/api/clinicians/')
+            if isinstance(response, list):
+                return response
+            elif isinstance(response, dict) and 'results' in response:
+                return response['results']
+            return []
+        except Exception as e:
+            logger.error(f"Failed to get clinicians: {str(e)}")
+            return []
+    
+    @staticmethod
     def check_all_services_health():
         """Check health status of all microservices"""
         services = {
@@ -134,7 +186,8 @@ class DatabaseService:
             'clinician-service': settings.CLINICIAN_SERVICE_URL,
             'database-service': settings.DATABASE_SERVICE_URL,
             'file-service': settings.FILE_SERVICE_URL,
-            'embedding-service': settings.EMBEDDING_SERVICE_URL,
+            'rag-embedding-service': settings.RAG_EMBEDDING_SERVICE_URL,
+            'ocr-service': settings.OCR_SERVICE_URL,
             'admin-service': 'http://admin-service:8005'  # Self check
         }
         
@@ -192,7 +245,12 @@ class DatabaseService:
     @staticmethod
     def create_rag_document(data):
         """Create RAG document association"""
-        return DatabaseService.make_request('POST', '/api/rag-documents/', data=data)
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info(f"Creating RAG document with data: {data}")
+        response = DatabaseService.make_request('POST', '/api/rag-documents/', data=data)
+        logger.info(f"RAG document creation response: {response}")
+        return response
     
     @staticmethod
     def get_rag_documents(cancer_type_id=None):

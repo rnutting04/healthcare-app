@@ -120,6 +120,21 @@ class DatabaseService:
             logger.error(f"Failed to get patient by user ID: {e}")
             return None
     
+    # Clinician profile operations
+    @staticmethod
+    def create_clinician_profile(clinician_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Create clinician profile"""
+        return DatabaseService.make_request('POST', '/api/clinicians/', data=clinician_data)
+    
+    @staticmethod
+    def get_clinician_by_user_id(user_id: int) -> Optional[Dict[str, Any]]:
+        """Get clinician profile by user ID"""
+        try:
+            return DatabaseService.make_request('GET', '/api/clinicians/by_user/', params={'user_id': user_id})
+        except Exception as e:
+            logger.error(f"Failed to get clinician by user ID: {e}")
+            return None
+    
     # Role operations
     @staticmethod
     def get_roles() -> List[Dict[str, Any]]:

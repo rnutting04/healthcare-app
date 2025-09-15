@@ -116,6 +116,11 @@ class PatientViewSet(viewsets.ViewSet):
     def dashboard(self, request):
         """Get patient dashboard data"""
         try:
+            # Debug logging
+            logger.info(f"Dashboard request - user_id: {getattr(request, 'user_id', 'None')}")
+            logger.info(f"Dashboard request - user_data type: {type(getattr(request, 'user_data', None))}")
+            logger.info(f"Dashboard request - user_data: {getattr(request, 'user_data', 'None')}")
+            
             patient = DatabaseService.get_patient_by_user_id(request.user_id)
             
             if patient:
@@ -123,19 +128,32 @@ class PatientViewSet(viewsets.ViewSet):
                 appointments = DatabaseService.get_upcoming_appointments(patient['id'])
                 
                 # Get recent medical records
-                medical_records = DatabaseService.get_medical_records({
-                    'patient_id': patient['id']
-                })
-                recent_records = sorted(medical_records, key=lambda x: x.get('created_at', ''), reverse=True)[:5]
+                try:
+                    medical_records = DatabaseService.get_medical_records({
+                        'patient_id': patient['id']
+                    })
+                    if isinstance(medical_records, list):
+                        recent_records = sorted(medical_records, key=lambda x: x.get('created_at', ''), reverse=True)[:5]
+                    else:
+                        logger.warning(f"Medical records returned non-list: {type(medical_records)}")
+                        recent_records = []
+                except Exception as e:
+                    logger.warning(f"Could not fetch medical records: {e}")
+                    recent_records = []
                 
                 # Get active prescriptions
                 active_prescriptions = DatabaseService.get_active_prescriptions(patient['id'])
                 
+                # Ensure user_data is a dict
+                user_data = getattr(request, 'user_data', {})
+                if not isinstance(user_data, dict):
+                    user_data = {}
+                
                 dashboard_data = {
                     'user_id': request.user_id,
-                    'first_name': request.user_data.get('first_name', 'Patient'),
-                    'last_name': request.user_data.get('last_name', ''),
-                    'email': request.user_data.get('email', ''),
+                    'first_name': user_data.get('first_name', 'Patient'),
+                    'last_name': user_data.get('last_name', ''),
+                    'email': user_data.get('email', ''),
                     'patient_profile': patient,
                     'upcoming_appointments': appointments[:5],
                     'recent_records': recent_records,
@@ -144,17 +162,25 @@ class PatientViewSet(viewsets.ViewSet):
                 return Response(dashboard_data)
             else:
                 # Return basic user data if patient profile doesn't exist yet
+                # Ensure user_data is a dict
+                user_data = getattr(request, 'user_data', {})
+                if not isinstance(user_data, dict):
+                    user_data = {}
+                    
                 return Response({
                     'user_id': request.user_id,
-                    'first_name': request.user_data.get('first_name', 'Patient'),
-                    'last_name': request.user_data.get('last_name', ''),
-                    'email': request.user_data.get('email', ''),
+                    'first_name': user_data.get('first_name', 'Patient'),
+                    'last_name': user_data.get('last_name', ''),
+                    'email': user_data.get('email', ''),
                     'upcoming_appointments': [],
                     'recent_records': [],
                     'active_prescriptions': []
                 })
         except Exception as e:
             logger.error(f"Failed to get dashboard data: {e}")
+            logger.error(f"Error type: {type(e)}, Error details: {str(e)}")
+            import traceback
+            logger.error(f"Traceback: {traceback.format_exc()}")
             return Response({'error': 'Failed to load dashboard'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
