@@ -34,7 +34,7 @@ RUN mkdir -p $HF_HOME && chown -R appuser:appuser /app && chown -R appuser:appus
 
 USER appuser
 
-EXPOSE 8008
+EXPOSE 8010
 
 ENV NAME="TranslationService"
 

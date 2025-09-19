@@ -173,7 +173,7 @@ if not DEBUG:
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
 
-CTRANS_API_BASE = "http://translation-service:8008/api"
+CTRANS_API_BASE = "http://translation-service:8010/api"
 TEMPLATES[0]["OPTIONS"]["context_processors"] += [
     "django.template.context_processors.request",
 ]

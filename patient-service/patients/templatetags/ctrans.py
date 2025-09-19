@@ -100,7 +100,7 @@ def _submit_translation(text: str, target_code: str, request) -> dict:
     """
     Sends the text to the external translation service API via a POST request.
     """
-    base_url = getattr(settings, "CTRANS_API_BASE", "http://translation-service:8008/api")
+    base_url = getattr(settings, "CTRANS_API_BASE", "http://translation-service:8010/api")
     auth_headers = auth_headers_from_request(request)
 
     # API call with timeout of 2s to connect and 6s to get a response

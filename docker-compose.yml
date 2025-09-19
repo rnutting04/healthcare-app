@@ -235,7 +235,7 @@ services:
       dockerfile: Dockerfile
     container_name: translation_app
     ports:
-      - "8008:8008"
+      - "8010:8010"
     environment:
       - REDIS_HOST=redis
       - REDIS_PORT=6379
