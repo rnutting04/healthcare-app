@@ -200,6 +200,42 @@ class Migration(migrations.Migration):
                 ],
             },
         ),
+        migrations.CreateModel(
+            name='ChatMessage',
+            fields=[
+                ('id', models.BigAutoField(primary_key=True, serialize=False)),
+                ('role', models.CharField(choices=[('user', 'User'), ('assistant', 'Assistant')], max_length=10)),
+                ('content', models.TextField()),
+                ('timestamp', models.DateTimeField(auto_now_add=True)),
+            ],
+            options={
+                'db_table': 'chat_messages',
+                'ordering': ['timestamp'],
+            },
+        ),
+        migrations.CreateModel(
+            name='ChatSession',
+            fields=[
+                ('id', models.UUIDField(default=uuid.uuid4, editable=False, primary_key=True, serialize=False)),
+                ('title', models.CharField(default='New Chat', max_length=100)),
+                ('created_at', models.DateTimeField(auto_now_add=True)),
+                ('suggestions', models.JSONField(blank=True, default=list)),
+            ],
+            options={
+                'db_table': 'chat_sessions',
+                'ordering': ['-created_at'],
+            },
+        ),
+        migrations.AddField(
+            model_name='chatsession',
+            name='patient',
+            field=models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='data_management.patient'),
+        ),
+        migrations.AddField(
+            model_name='chatmessage',
+            name='session',
+            field=models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='messages', to='data_management.chatsession'),
+        ),   
         migrations.RunPython(
             code=lambda apps, schema_editor: populate_initial_data(apps, schema_editor),
             reverse_code=migrations.RunPython.noop,

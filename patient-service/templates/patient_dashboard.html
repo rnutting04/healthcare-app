@@ -74,69 +74,31 @@
             </div>
         </div>
     </div>
-    
-    <!-- RAG Chatbot Card -->
+       <!-- Talk with an AI Card -->
     <div class="mt-8">
-        <div class="bg-white overflow-hidden shadow rounded-lg">
+        <h3 class="text-lg font-medium text-gray-900 mb-4">{% trans "Apps" %}</h3>
+        <div class="bg-white overflow-hidden shadow rounded-lg transform transition-all duration-200 hover:scale-105">
             <div class="p-5">
-                <div class="flex items-center justify-between mb-4">
-                    <h3 class="text-lg font-medium text-gray-900">{% trans "Medical Assistant" %}</h3>
-                    <span id="chatContextBadge" class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                        <!-- Cancer type context will be shown here -->
-                    </span>
-                </div>
-                
-                <!-- Chat Messages Container -->
-                <div id="chatMessages" class="h-96 overflow-y-auto mb-4 p-4 bg-gray-50 rounded-lg space-y-3">
-                    <!-- Welcome message -->
-                    <div class="flex justify-start">
-                        <div class="max-w-xs lg:max-w-md">
-                            <div class="bg-white p-3 rounded-lg shadow">
-                                <p class="text-sm text-gray-800">
-                                    {% trans "Hello! I'm your medical assistant. I can help answer questions about your condition based on medical documents. How can I help you today?" %}
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- Typing Indicator -->
-                <div id="typingIndicator" class="hidden px-4 py-2">
-                    <div class="flex items-center space-x-2">
-                        <div class="flex space-x-1">
-                            <div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style="animation-delay: 0ms;"></div>
-                            <div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style="animation-delay: 150ms;"></div>
-                            <div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style="animation-delay: 300ms;"></div>
-                        </div>
-                        <span class="text-sm text-gray-500">{% trans "Assistant is typing..." %}</span>
-                    </div>
-                </div>
-                
-                <!-- Chat Input -->
-                <div class="flex items-end space-x-2">
-                    <div class="flex-1">
-                        <textarea 
-                            id="chatInput" 
-                            rows="2" 
-                            class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm resize-none"
-                            placeholder="{% trans 'Type your question here...' %}"
-                        ></textarea>
-                    </div>
-                    <button 
-                        id="sendChatButton"
-                        type="button" 
-                        class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path>
+                <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                        <!-- Chat Icon SVG -->
+                        <svg class="h-6 w-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M7 8h10M7 12h6m-2 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
                         </svg>
-                        <span class="ml-2">{% trans "Send" %}</span>
-                    </button>
+                    </div>
+                    <div class="ml-5 w-0 flex-1">
+                        <dt class="text-sm font-medium text-gray-500 truncate">{% trans "Talk with an AI" %}</dt>
+                        <dd class="text-lg font-medium text-gray-900">{% trans "AI Assistant" %}</dd>
+                    </div>
                 </div>
+            </div>
+            <div class="bg-gray-50 px-5 py-3">
+                <a href="/patient/chat" class="text-sm font-medium text-blue-600 hover:text-blue-900">{% trans "Start chatting" %}</a>
             </div>
         </div>
     </div>
-    
+</div>
     <!-- Recent Activity -->
     <div class="mt-8">
         <h3 class="text-lg font-medium text-gray-900 mb-4">{% trans "Recent Activity" %}</h3>
@@ -159,7 +121,6 @@
 {% endblock %}
 
 {% block extra_scripts %}
-<script src="{% static 'js/rag-chatbot.js' %}"></script>
 <script>
 async function loadDashboard() {
     try {

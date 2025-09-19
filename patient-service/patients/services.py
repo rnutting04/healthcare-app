@@ -231,3 +231,91 @@ class DatabaseService:
             })
         except Exception as e:
             logger.error(f"Failed to log event: {e}")
+
+
+    @staticmethod
+    def create_chat_session(patient_id: int) -> Optional[Dict[str, Any]]:
+        try:
+            return DatabaseService.make_request("POST", "/api/chat/start/", data={"patient_id": patient_id})
+        except Exception as e:
+            logger.error(f"Failed to create chat session for patient {patient_id}: {e}")
+            return None
+
+    @staticmethod
+    def get_chat_sessions_by_patient(patient_id: int) -> List[Dict[str, Any]]:
+        try:
+            return DatabaseService.make_request("GET", f"/api/chat/sessions/?patient_id={patient_id}")
+        except Exception as e:
+            logger.error(f"Failed to get sessions for patient {patient_id}: {e}")
+            return []
+
+    @staticmethod
+    def get_session_and_messages(session_id: str, patient_id: int) -> tuple[Optional[Dict[str, Any]], List[Dict[str, Any]]]:
+        try:
+            session = DatabaseService.make_request("GET", f"/api/chat/load/?session_id={session_id}&patient_id={patient_id}")
+            messages = DatabaseService.make_request("GET", f"/api/chat/messages/?session_id={session_id}")
+            return session, messages
+        except Exception as e:
+            logger.error(f"Failed to load session and messages for session {session_id}: {e}")
+            return None, []
+
+    @staticmethod
+    def get_latest_chat_session(patient_id: int) -> Optional[Dict[str, Any]]:
+        # Optional: need to expose this on the DB side if it's not already there
+        pass
+
+    @staticmethod
+    def get_chat_session_by_id_and_patient(session_id: str, patient_id: int) -> Optional[Dict[str, Any]]:
+        session, _  = DatabaseService.get_session_and_messages(session_id, patient_id)
+        return session
+
+    @staticmethod
+    def get_messages_for_session(session_id: str) -> List[Dict[str, Any]]:
+        _, messages = DatabaseService.get_session_and_messages(session_id, 0)  # If patient check is not required
+        return messages
+
+    @staticmethod
+    def create_chat_message(session_id: str, role: str, content: str) -> Optional[Dict[str, Any]]:
+        try:
+            return DatabaseService.make_request("POST", "/api/chat/message/", data={
+                "session_id": session_id,
+                "role": role,
+                "content": content
+            })
+        except Exception as e:
+            logger.error(f"Failed to create message for session {session_id}: {e}")
+            return None
+
+    @staticmethod
+    def update_session_title(session_id: str, title: str) -> bool:
+        try:
+            # Optional: Expose a PATCH method on the DB ChatViewSet to update title
+            return DatabaseService.make_request("POST", f"/api/chat/rename_session/", data={
+                "session_id": session_id,
+                "title": title})
+        except Exception as e:
+            logger.error(f"Failed to update title for session {session_id}: {e}")
+            return False
+
+    @staticmethod
+    def delete_chat_session(session_id: str, patient_id: int) -> bool:
+        try:
+            return DatabaseService.make_request("DELETE", f"/api/chat/{session_id}/delete/?patient_id={patient_id}")
+        except Exception as e:
+            logger.error(f"Failed to delete session {session_id}: {e}")
+            return False
+
+    @staticmethod
+    def update_session_suggestions(session_id: str, suggestions: List[str]) -> bool:
+        try:
+            return DatabaseService.make_request("POST", f"/api/chat/suggestions/", data={"session_id": session_id, "suggestions": suggestions})
+        except Exception as e:
+            logger.error(f"Failed to update suggestions for session {session_id}: {e}")
+            return False
+
+    @staticmethod
+    def get_embedding_chunks() -> List[Dict[str, Any]]:
+        try:
+            return DatabaseService.make_request("GET", "/api/embedding-chunks/embeddings/")
+        except Exception as e:
+            return []

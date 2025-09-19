@@ -58,6 +58,7 @@ services:
       - DATABASE_SERVICE_URL=http://database-service:8004
       - AUTH_SERVICE_URL=http://auth-service:8001
       - SECRET_KEY=${SECRET_KEY:-your-secret-key-here}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
       - DEBUG=${DEBUG:-True}
       - ALLOWED_HOSTS=${ALLOWED_HOSTS:-*}
       - JWT_SECRET_KEY=${JWT_SECRET_KEY:-your-secret-key-here}
@@ -228,6 +229,32 @@ services:
             - driver: nvidia
               count: all
               capabilities: [gpu]
+              
+  suggestion-service:
+    build:
+      context: ./suggestion-service
+      dockerfile: Dockerfile
+    ports:
+      - "8009:8009"
+    environment:
+      - DATABASE_SERVICE_URL=http://database-service:8004/api/chat
+      - AUTH_SERVICE_URL=http://auth-service:8001
+      - FILE_SERVICE_URL=http://file-service:8006
+      - REDIS_URL=redis://redis:6379
+      - DATABASE_SERVICE_TOKEN=${DATABASE_SERVICE_TOKEN:-db-service-secret-token}
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-your-secret-key-here}
+      - SECRET_KEY=${SECRET_KEY:-your-secret-key-here}
+    
+      - DEBUG=${DEBUG:-True}
+      - ALLOWED_HOSTS=${ALLOWED_HOSTS:-*}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - OPENAI_EMBEDDING_MODEL=${OPENAI_EMBEDDING_MODEL:-text-embedding-ada-002}
+      - SUGGESTION_CHUNK_SIZE=${SUGGESTION_CHUNK_SIZE:-1000}
+    depends_on:
+      - database-service
+      - auth-service
+    volumes:
+      - ./suggestion-service:/app
 
   translation-service:
     build:

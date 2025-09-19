@@ -151,7 +151,11 @@ redis_parsed = urlparse(REDIS_URL)
 REDIS_HOST = redis_parsed.hostname or 'redis'
 REDIS_PORT = redis_parsed.port or 6379
 
+OPENAI_MAX_TOKENS_PER_CHUNK = config('OPENAI_MAX_TOKENS_PER_CHUNK', default=3000)
+OPENAI_API_KEY = config('OPENAI_API_KEY', default='xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx')
+
 # REST Framework settings
+
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [],
     'DEFAULT_PERMISSION_CLASSES': [],  # JWT middleware handles authentication
