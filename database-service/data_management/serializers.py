@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from .models import User, Role, Patient, Clinician, EventLog, CancerType, FileMetadata, RAGDocument, Language, RAGEmbedding, RAGEmbeddingJob, PatientAssignment, MedicalRecordType, MedicalRecord, MedicalRecordAccess, ChatMessage, ChatSession
+from .models import SuggestionTemplate, SuggestedHistory
 
 class LanguageSerializer(serializers.ModelSerializer):
     class Meta:
@@ -270,3 +271,14 @@ class ChatSessionSerializer(serializers.ModelSerializer):
     class Meta:
         model  = ChatSession
         fields = ["id","patient_id", "title", "created_at", "messages", "suggestions"]
+
+class SuggestionTemplateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = SuggestionTemplate
+        fields = ("id", "cancer_type", "text", "embedding_json")
+
+class SuggestedHistorySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = SuggestedHistory
+        fields = ("session", "text", "created_at")
+

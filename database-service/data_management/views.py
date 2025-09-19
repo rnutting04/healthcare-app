@@ -1,4 +1,5 @@
-from rest_framework import viewsets, status, filters
+from rest_framework import viewsets, status, filters, permissions
+from rest_framework.exceptions import NotFound, PermissionDenied
 from rest_framework.decorators import action, api_view
 from rest_framework.response import Response
 from rest_framework.pagination import PageNumberPagination
@@ -9,6 +10,7 @@ from django.db.models import Q
 from django.utils import timezone
 from datetime import datetime, timedelta
 from .models import User, Role, Patient, Clinician, EventLog, CancerType, UserEncryptionKey, FileMetadata, FileAccessLog, RAGDocument, RefreshToken, Language, RAGEmbedding, RAGEmbeddingJob, PatientAssignment, MedicalRecordType, MedicalRecord, MedicalRecordAccess, ChatMessage, ChatSession
+from .models import SuggestionTemplate, SuggestedHistory
 from .serializers import (
     UserSerializer, PatientSerializer, ClinicianSerializer,
     EventLogSerializer, CancerTypeSerializer,
@@ -16,7 +18,7 @@ from .serializers import (
     RAGEmbeddingSerializer, RAGEmbeddingJobSerializer, EmbeddingCreateSerializer,
     BulkEmbeddingCreateSerializer, EmbeddingSearchSerializer, PatientAssignmentSerializer,
     MedicalRecordTypeSerializer, MedicalRecordSerializer, MedicalRecordAccessSerializer,
-    ChatMessageSerializer, ChatSessionSerializer
+    ChatMessageSerializer, ChatSessionSerializer, SuggestionTemplateSerializer, SuggestedHistorySerializer
 )
 
 
@@ -1202,8 +1204,23 @@ class MedicalRecordAccessViewSet(viewsets.ModelViewSet):
             'revoked_at': access.revoked_at
         })
     
-
+        
 class ChatViewSet(viewsets.ViewSet):
+
+    def _session_for_user_or_403(self, request, sid: str) -> ChatSession:
+        if not sid:
+            raise NotFound("session_id required")
+
+        session = (
+            ChatSession.objects
+            .select_related("patient")
+            .filter(id=sid, patient__user_id=request.user.id)   # <- change if your field names differ
+            .first()
+        )
+        if not session:
+            # Either it doesn't exist OR it's not owned by this user
+            raise PermissionDenied("You do not have access to this session")
+        return session
 
     @action(detail=False, methods=['get'])
     def sessions(self, request):
@@ -1288,3 +1305,48 @@ class ChatViewSet(viewsets.ViewSet):
         session.suggestions = suggestions
         session.save(update_fields=['suggestions'])
         return Response({'success': True})
+
+    @action(detail=False, methods=['get'], url_path='internal/sessions/last-messages')
+    def internal_last_messages(self, request):
+        sid = request.query_params.get('session_id')
+        limit = int(request.query_params.get('limit', 5))
+        session = self._session_for_user_or_403(request, sid)
+        msgs = ChatMessage.objects.filter(session=session).order_by('-timestamp')[:limit]
+        msgs = list(reversed(list(msgs)))  # chronological
+        return Response(ChatMessageSerializer(msgs, many=True).data, status=200)
+
+    @action(detail=False, methods=['get'], url_path='internal/suggestions/templates')
+    def internal_templates(self, request):
+        # templates are global; no ownership check
+        ct = (request.query_params.get('cancer_type') or '').strip().lower()
+        qs = SuggestionTemplate.objects.filter(cancer_type=ct) if ct else SuggestionTemplate.objects.all()
+        return Response(SuggestionTemplateSerializer(qs, many=True).data, status=200)
+
+    @action(detail=False, methods=['get', 'post'], url_path='internal/suggestions/history',
+            permission_classes=[permissions.IsAuthenticated])
+    def internal_suggestions_history(self, request):
+        if request.method == 'GET':
+            sid = request.query_params.get('session_id')
+            session = self._session_for_user_or_403(request, sid)
+            texts = list(SuggestedHistory.objects.filter(session=session)
+                        .values_list('text', flat=True))
+            return Response(texts, status=200)
+
+        # POST: append used items to history
+        sid   = request.data.get('session_id')
+        items = request.data.get('items') or []
+        session = self._session_for_user_or_403(request, sid)
+        objs = [SuggestedHistory(session=session, text=t) for t in items[:4]]
+        SuggestedHistory.objects.bulk_create(objs, ignore_conflicts=True)  # unique_together(session,text)
+        return Response({'success': True}, status=200)
+
+    # Store last 4 on the session so the UI can reload them
+    @action(detail=False, methods=['post'], url_path='suggestions')
+    def store_last4(self, request):
+        sid   = request.data.get('session_id')
+        items = request.data.get('suggestions') or []
+        session = self._session_for_user_or_403(request, sid)
+        session.suggestions = items[:4]
+        session.save(update_fields=['suggestions'])
+        return Response({'success': True}, status=200)
+

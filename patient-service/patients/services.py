@@ -318,5 +318,4 @@ class DatabaseService:
         try:
             return DatabaseService.make_request("GET", "/api/embedding-chunks/embeddings/")
         except Exception as e:
-            logger.error(f"Failed to get embeddings chunks: {e}")
             return []

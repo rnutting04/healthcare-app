@@ -130,7 +130,6 @@ const pushMsg = (role, content) => {
 let token = localStorage.getItem('access_token');
 let sessionId = null;
 let activeButton = null;
-let cancerType = null;
 
 function scrollToBottom() {
     chatBox.scrollTop = chatBox.scrollHeight;
@@ -194,57 +193,47 @@ function renderSessionButton(session) {
 }
 
 function appendMessage(role, content) {
-  // OUTER ROW: controls left/right alignment and icon placement
-  const msgWrapper = document.createElement('div');
-  msgWrapper.className = `message-group mt-3 flex items-start gap-2 ${
-    role === 'user' ? 'justify-end' : 'justify-start'
-  }`;
+    const msgWrapper = document.createElement('div');
+    msgWrapper.className = role === 'user' ? 'flex justify-end items-start space-x-2' : 'flex justify-start items-start space-x-2';
 
-  // icon (unchanged)
-  const icon = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-  icon.setAttribute("class", "h-5 w-5 " + (role === 'user' ? "text-blue-600" : "text-gray-600"));
-  icon.setAttribute("viewBox", "0 0 24 24");
-  icon.setAttribute("fill", role === 'user' ? "none" : "currentColor");
-  if (role === 'user') {
-    icon.setAttribute("stroke", "currentColor");
-    icon.setAttribute("stroke-width", "2");
-    icon.innerHTML = `<path d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zM12 14.4c-4.8 0-8.4 2.4-8.4 4.8V21h16.8v-1.8c0-2.4-3.6-4.8-8.4-4.8z"/>`;
-  } else {
-    icon.innerHTML = `
-      <path d="M3 5a2 2 0 012-2h14a2 2 0 012 2v11a2 2 0 01-2 2H8l-4 4v-4H5a2 2 0 01-2-2V5z"/>
-      <path fill="#3B82F6" d="M12 7h-1v2H9v1h2v2h1v-2h2V9h-2V7z"/>
-    `;
-  }
+    const icon = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    icon.setAttribute("class", "h-5 w-5 " + (role === 'user' ? "text-blue-600" : "text-gray-600"));
+    icon.setAttribute("viewBox", "0 0 24 24");
+    icon.setAttribute("fill", role === 'user' ? "none" : "currentColor");
 
-  // CONTENT COLUMN: vertical stack -> bubble (and later) suggestions
-  const contentCol = document.createElement('div');
-  contentCol.className = `flex flex-col ${role === 'user' ? 'items-end' : 'items-start'} max-w-[75%]`;
+    if (role === 'user') {
+        icon.setAttribute("stroke", "currentColor");
+        icon.setAttribute("stroke-width", "2");
+        icon.innerHTML = `
+            <path d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zM12 14.4c-4.8 0-8.4 2.4-8.4 4.8V21h16.8v-1.8c0-2.4-3.6-4.8-8.4-4.8z"/>
+        `;
+    } else {
+        icon.innerHTML = `
+          <path d="M3 5a2 2 0 012-2h14a2 2 0 012 2v11a2 2 0 01-2 2H8l-4 4v-4H5a2 2 0 01-2-2V5z"/>
+          <path fill="#3B82F6" d="M12 7h-1v2H9v1h2v2h1v-2h2V9h-2V7z"/>
+        `;
+    }
 
-  // bubble
-  const bubble = document.createElement('div');
-  bubble.className = (role === 'user'
-    ? 'bg-blue-600 text-white'
-    : 'bg-gray-200 text-gray-800') + ' p-3 rounded-lg text-sm whitespace-pre-line';
-  // safer than innerHTML+replace (prevents XSS); preserves newlines with CSS
-  bubble.textContent = content;
+    // Message Bubble
+    const bubble = document.createElement('div');
+    bubble.className = (role === 'user'
+        ? 'bg-blue-600 text-white'
+        : 'bg-gray-200 text-gray-800') +
+        ' p-3 rounded-lg max-w-xs text-sm';
+    bubble.innerHTML = content.replace(/\n/g, '<br>');
 
-  contentCol.appendChild(bubble);
-
-  // assemble left/right
-  if (role === 'user') {
-    msgWrapper.appendChild(contentCol);
-    msgWrapper.appendChild(icon);
-  } else {
-    msgWrapper.appendChild(icon);
-    msgWrapper.appendChild(contentCol);
-  }
-
-  pushMsg(role, content);
-  chatBox.appendChild(msgWrapper);
-  scrollToBottom();
-
-  // IMPORTANT: return the vertical column so you can append suggestions under the bubble
-  return contentCol;
+    // Append in correct order
+    if (role === 'user') {
+        msgWrapper.appendChild(bubble);
+        msgWrapper.appendChild(icon);
+    } else {
+        msgWrapper.appendChild(icon);
+        msgWrapper.appendChild(bubble);
+    }
+    pushMsg(role, content);
+    chatBox.appendChild(msgWrapper);
+    scrollToBottom();
+    return bubble;
 }
 
 async function loadChatContext() {
@@ -259,7 +248,7 @@ async function loadChatContext() {
             
             if (response.ok) {
                 const data = await response.json();
-                cancerType = data.cancer_type.charAt(0).toUpperCase() + data.cancer_type.slice(1);
+                const cancerType = data.cancer_type.charAt(0).toUpperCase() + data.cancer_type.slice(1);
                 contextBadge.textContent = `${cancerType} Cancer${data.is_fallback ? ' (Default)' : ''}`;
                 contextBadge.title = data.is_fallback 
                     ? 'Using general uterine cancer information' 
@@ -308,11 +297,9 @@ async function loadSession(id) {
         const data = await res.json();
         const messages = data.messages;
         chatBox.innerHTML = '';
-        let bubble = null;
         for (const msg of data.messages) {
-            bubble = appendMessage(msg.role, msg.content);
+            appendMessage(msg.role, msg.content);
         }
-        renderSuggestionsUnderGroup(bubble, data.suggestions);
     } else {
         console.error("Failed to load session");
     }
@@ -350,41 +337,37 @@ toggleBtn.addEventListener('click', () => {
   closeBtn.classList.remove('hidden');
 });
 
-function clearAllSuggestions() {
-  document.querySelectorAll('.suggestions-row').forEach(el => el.remove());
-}
+function renderSuggestionsUnderBubble(bubbleEl, suggestions) {
+  if (!bubbleEl || !suggestions?.length) return;
 
-function renderSuggestionsUnderGroup(groupEl, suggestions) {
-  if (!groupEl || !suggestions?.length) return;
-
-  // remove any existing suggestions under this group (safety)
-  groupEl.querySelector('.suggestions-row')?.remove();
-
+  // suggestions row (same parent as the bubble)
   const row = document.createElement('div');
-  row.className = 'suggestions-row mt-2 flex flex-wrap gap-2 self-start w-full';
+  row.className = 'mt-2 flex flex-wrap gap-2';
+
+  // optional: indent to align under the bubble (tweak as you like)
+  // e.g., match bubble’s left padding + a bit
+  row.style.paddingLeft = '0.5rem';
 
   suggestions.slice(0, 4).forEach(s => {
     const btn = document.createElement('button');
     btn.type = 'button';
-    btn.className = 'text-xs text-white px-3 py-1 rounded-full bg-blue-500 hover:bg-blue-500/75';
+    btn.className = 'text-xs px-3 py-1 rounded-full bg-slate-100 hover:bg-slate-200';
     btn.textContent = s;
     btn.addEventListener('click', () => {
-      clearAllSuggestions();          // hide chips as soon as user picks one
-      appendMessage("user", s);
       sendMessage(s);
       chatInput.focus();
     });
     row.appendChild(btn);
   });
 
-  groupEl.appendChild(row); // under the bubble, not to the right
+  // insert AFTER the bubble (sibling)
+  bubbleEl.insertAdjacentElement('afterend', row);
 }
 
 async function sendMessage(message) {
     
         try {
              // Add AI typing indicator
-            clearAllSuggestions();
             const typingElement = document.createElement('div');
             typingElement.className = "flex justify-start fade-in";
             typingElement.innerHTML = `
@@ -417,22 +400,16 @@ async function sendMessage(message) {
             try {
               // Build last 5 messages as "role: text" (user/assistant)
               const last5 = convo.slice(-5).map(m => `${m.role}: ${m.content}`);
-              console.log(cancerType)
+
               const sres = await fetch("/api/suggest/", {
                 method: "POST",
-                headers: {  
-                "Content-Type": "application/json",
-                "Authorization": "Bearer " + token
-                },
-                body: JSON.stringify({
-                session_id: sessionId,
-                cancer_type: cancerType
-                })
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ conversation: last5 })
               });
               const sdata = await sres.json();
               const suggestions = (sdata.top_4 || []).slice(0, 4);
 
-              renderSuggestionsUnderGroup(bubbleEl, suggestions);
+              renderSuggestionsUnderBubble(bubbleEl, suggestions);
               scrollToBottom();
             } catch (e) {
               // optional fallback for POC
@@ -479,7 +456,7 @@ document.addEventListener("DOMContentLoaded", async () =>{
     
         appendMessage("user", message);
         chatInput.value = "";
-        await sendMessage(message);
+        await sendMessage(message, sessionId);
         suggestionContainer.innerHTML = '';
         await loadSessions();
     });

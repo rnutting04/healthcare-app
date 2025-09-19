@@ -14,7 +14,6 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-
 class PatientViewSet(viewsets.ViewSet):
     """Patient ViewSet using DatabaseService"""
     

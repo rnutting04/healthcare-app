@@ -447,3 +447,34 @@ class ChatMessage(models.Model):
         
     def __str__(self):
         return f"Chat Message {self.id}"
+
+class SuggestionTemplate(models.Model):
+    """Seeded catalog of suggestion questions, grouped by cancer type."""
+    cancer_type = models.CharField(max_length=64, db_index=True)
+    text = models.TextField()
+    # Optional: keep room for a precomputed vector if you decide to store it later.
+    embedding_json = models.JSONField(null=True, blank=True)
+
+    class Meta:
+        db_table = "suggestion_templates"
+        unique_together = ("cancer_type", "text")
+        indexes = [models.Index(fields=["cancer_type"])]
+
+    def __str__(self):
+        return f"[{self.cancer_type}] {self.text[:60]}"
+
+class SuggestedHistory(models.Model):
+    """What we already suggested in a given session (prevents repeats)."""
+    session = models.ForeignKey(
+        "ChatSession", on_delete=models.CASCADE, related_name="suggested_history"
+    )
+    text = models.TextField()
+    created_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        db_table = "suggested_history"
+        unique_together = ("session", "text")
+        indexes = [models.Index(fields=["session", "-created_at"])]
+
+    def __str__(self):
+        return f"{self.session_id} :: {self.text[:60]}"
