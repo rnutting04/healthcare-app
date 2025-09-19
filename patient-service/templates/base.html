@@ -136,6 +136,96 @@
                 menuClose.classList.toggle('hidden');
             });
         });
+
+    // wait until the entire HTML page is fully loaded before running any code
+    document.addEventListener('DOMContentLoaded', () => {
+        // call the function  to load the main dashboard via API
+        loadDashboard();
+
+        // --- CTRANS WebSocket Logic ---
+        function startTranslationSocket() {
+            // find all HTML elements on the page that has 'data-ctrans-request-id' attribute
+            const pendingElements = document.querySelectorAll('span[data-ctrans-request-id]');
+            // if not such elements are found
+            if (pendingElements.length === 0) {
+                return;
+            }
+
+            // links each requestID to its corresponding HTML element
+            const translationMap = new Map();
+            // loop through each element
+            pendingElements.forEach(el => {
+                // get request ID attribute
+                const requestId = el.dataset.ctransRequestId;
+                if (requestId) {
+                    //add entry to map
+                    translationMap.set(requestId, el);
+                }
+            });
+
+            // check if website is loaded securely (https) or not (http)
+            const wsProtocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
+
+            // build the full websocket connection URL dynamically based on current page's address
+            const wsURL = `${wsProtocol}://${window.location.host}/ws/translations/`;
+
+            // create new websocket object
+            const ws = new WebSocket(wsURL);
+
+            //define what happens when websocket connection is successfully opened
+            ws.onopen = () => {
+                console.log('[ctrans] WebSocket connection opened. Awaiting authentication prompt.');
+            };
+
+            // define what happens every time a message is recieved from the server
+            ws.onmessage = (event) => {
+                // takes raw message data (JSON string) and parse it into javascript object
+                const data = JSON.parse(event.data);
+                console.log('[ctrans] Received message:', data);
+
+                // check if server is requesting authentication
+                if (data.type === 'auth_required') {
+                    //get JWT access token
+                    const token = localStorage.getItem('access_token');
+                    // send token back to server in the required format
+                    ws.send(JSON.stringify({ type: 'authenticate', token: token }));
+                    //stop processing this message and wait for server's next response
+                    return;
+                }
+
+                // check if the server has confirmed that authenticationw as successful
+                if (data.type === 'auth_success') {
+                    // get all the unique request IDs from our map
+                    const requestIds = Array.from(translationMap.keys());
+                    // send list of IDs to server and subscribe for updates
+                    ws.send(JSON.stringify({ type: 'subscribe_to_translations', request_ids: requestIds }));
+                    //stop processing this message and wait for server's next response
+                    return;
+                }
+
+                // check if the message is a completed translation job.
+                if (data.type === 'job_complete' && data.job_id && data.result) {
+                    // look up the corresponding HTML element in our map using the job_id
+                    const elementToUpdate = translationMap.get(data.job_id);
+
+                    if (elementToUpdate) {
+                        const newTextNode = document.createTextNode(data.result);
+                        
+                        elementToUpdate.parentNode.replaceChild(newTextNode, elementToUpdate);
+                    }
+                }
+
+                if (data.type === 'job_error') {
+                    console.error(`Translation failed for job ${data.job_id}: ${data.message}`);
+                }
+            };
+
+            ws.onclose = () => console.log('[ctrans] WebSocket connection closed.');
+            ws.onerror = (error) => console.error('[ctrans] WebSocket error:', error);
+        }
+
+        startTranslationSocket();
+    });
     </script>
 
     {% block extra_scripts %}{% endblock %}
