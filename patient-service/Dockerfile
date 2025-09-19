@@ -43,4 +43,3 @@ RUN dos2unix /entrypoint.sh
 EXPOSE 8002
 
 ENTRYPOINT ["/entrypoint.sh"]
-CMD ["gunicorn", "--bind", "0.0.0.0:8002", "--workers", "4", "--threads", "2", "wsgi:application"]

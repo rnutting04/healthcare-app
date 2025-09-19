@@ -1,5 +1,6 @@
 {% extends 'base.html' %}
 {% load i18n %}
+{% load ctrans %}
 {% load static %}
 
 {% block title %}{% trans "Patient Dashboard" %} - {% trans "Healthcare Portal" %}{% endblock %}
@@ -75,7 +76,7 @@
     </div>
        <!-- Talk with an AI Card -->
     <div class="mt-8">
-        <h3 class="text-lg font-medium text-gray-900 mb-4">{% trans "Apps" %}</h3>
+        <h3 class="text-lg font-medium text-gray-900 mb-4">{% ctrans "Apps" %}</h3>
         <div class="bg-white overflow-hidden shadow rounded-lg transform transition-all duration-200 hover:scale-105">
             <div class="p-5">
                 <div class="flex items-center">
@@ -87,13 +88,13 @@
                         </svg>
                     </div>
                     <div class="ml-5 w-0 flex-1">
-                        <dt class="text-sm font-medium text-gray-500 truncate">{% trans "Talk with an AI" %}</dt>
-                        <dd class="text-lg font-medium text-gray-900">{% trans "AI Assistant" %}</dd>
+                        <dt class="text-sm font-medium text-gray-500 truncate">{% ctrans "Talk with an AI" %}</dt>
+                        <dd class="text-lg font-medium text-gray-900">{% ctrans "AI Assistant" %}</dd>
                     </div>
                 </div>
             </div>
             <div class="bg-gray-50 px-5 py-3">
-                <a href="/patient/chat" class="text-sm font-medium text-blue-600 hover:text-blue-900">{% trans "Start chatting" %}</a>
+                <a href="/patient/chat" class="text-sm font-medium text-blue-600 hover:text-blue-900">{% ctrans "Start chatting" %}</a>
             </div>
         </div>
     </div>
@@ -110,6 +111,13 @@
         </div>
     </div>
 </div>
+
+  {# CTRANS TEST #}
+    <div class="mt-8 p-4 bg-blue-100 border-l-4 border-blue-500 text-blue-800">
+      <p class="font-bold">{%ctrans "A Note From Your Doctor:" %}</p>
+      <p>{%ctrans "An apple a day keeps the doctor away" %}</p>
+</p>
+    </div>
 {% endblock %}
 
 {% block extra_scripts %}
@@ -197,7 +205,7 @@ async function loadDashboard() {
         });
         
         if (activityList.children.length === 0) {
-            activityList.innerHTML = '<li class="px-4 py-4"><p class="text-sm text-gray-500">No recent activity</p></li>';
+            activityList.innerHTML = '<li class="px-4 py-4"><p class="text-sm text-gray-500">{%ctrans "No recent activity" %}</p></li>';
         }
         
     } catch (error) {
@@ -206,11 +214,9 @@ async function loadDashboard() {
         document.getElementById('appointmentCount').textContent = '0';
         document.getElementById('prescriptionCount').textContent = '0';
         document.getElementById('recordCount').textContent = '0';
-        document.getElementById('recentActivity').innerHTML = '<li class="px-4 py-4"><p class="text-sm text-gray-500">No recent activity</p></li>';
+        document.getElementById('recentActivity').innerHTML = '<li class="px-4 py-4"><p class="text-sm text-gray-500">{%ctrans "No recent activity" %}</p></li>';
     }
 }
 
-// Load dashboard on page load
-document.addEventListener('DOMContentLoaded', loadDashboard);
 </script>
 {% endblock %}

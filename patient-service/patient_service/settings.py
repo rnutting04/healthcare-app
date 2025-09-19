@@ -3,7 +3,7 @@ from pathlib import Path
 from decouple import config
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
-BASE_DIR = Path(__file__).resolve().parent
+BASE_DIR = Path(__file__).resolve().parent.parent
 
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = config('SECRET_KEY', default='django-insecure-dev-key')
@@ -15,6 +15,7 @@ ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='*').split(',')
 
 # Application definition
 INSTALLED_APPS = [
+    'daphne',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -24,6 +25,7 @@ INSTALLED_APPS = [
     'rest_framework',
     'corsheaders',
     'drf_yasg',
+    'channels',
     'patients',
 ]
 
@@ -40,7 +42,7 @@ MIDDLEWARE = [
     'patients.middleware.UserLanguageMiddleware',  # Custom middleware to set language
 ]
 
-ROOT_URLCONF = 'urls'
+ROOT_URLCONF = 'patient_service.urls'
 
 TEMPLATES = [
     {
@@ -58,7 +60,8 @@ TEMPLATES = [
     },
 ]
 
-WSGI_APPLICATION = 'wsgi.application'
+WSGI_APPLICATION = 'patient_service.wsgi.application'
+ASGI_APPLICATION = 'patient_service.asgi.application'
 
 # Minimal database config for Django internals (using in-memory SQLite)
 DATABASES = {
@@ -137,8 +140,20 @@ DATABASE_SERVICE_TOKEN = config('DATABASE_SERVICE_TOKEN', default='db-service-se
 # JWT Settings
 JWT_SECRET_KEY = config('JWT_SECRET_KEY', default=SECRET_KEY)
 JWT_ALGORITHM = config('JWT_ALGORITHM', default='HS256')
+
+# Redis configuration
+REDIS_URL = os.getenv('REDIS_URL', 'redis://redis:6379')
+REDIS_DB = int(os.getenv('TRANSLATION_REDIS_DB', '3')) #Use DB 3 for translation service
+
+# Parse Redis URL for Channels
+from urllib.parse import urlparse
+redis_parsed = urlparse(REDIS_URL)
+REDIS_HOST = redis_parsed.hostname or 'redis'
+REDIS_PORT = redis_parsed.port or 6379
+
 OPENAI_MAX_TOKENS_PER_CHUNK = config('OPENAI_MAX_TOKENS_PER_CHUNK', default=3000)
 OPENAI_API_KEY = config('OPENAI_API_KEY', default='xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx')
+
 # REST Framework settings
 
 REST_FRAMEWORK = {
@@ -161,3 +176,20 @@ if not DEBUG:
     SECURE_SSL_REDIRECT = True
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
+
+CTRANS_API_BASE = "http://translation-service:8010/api"
+TEMPLATES[0]["OPTIONS"]["context_processors"] += [
+    "django.template.context_processors.request",
+]
+
+# Channels configuration
+CHANNEL_LAYERS = {
+    'default': {
+        'BACKEND': 'channels_redis.core.RedisChannelLayer',
+        'CONFIG': {
+            "hosts": [f"redis://redis:6379/{REDIS_DB}"],
+            "capacity": 1500,
+            "expiry": 10,
+        },
+    },
+}
