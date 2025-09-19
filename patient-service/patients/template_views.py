@@ -20,3 +20,7 @@ def patient_prescriptions(request):
 @ensure_csrf_cookie
 def patient_profile_edit(request):
     return render(request, 'patient_profile_edit.html')
+
+@ensure_csrf_cookie
+def patient_chat(request):
+    return render(request, 'chat_bot.html')

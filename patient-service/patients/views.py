@@ -7,12 +7,12 @@ from .services import DatabaseService
 from .serializers import (
     PatientSerializer, AppointmentSerializer, 
     MedicalRecordSerializer, PrescriptionSerializer,
-    PatientDashboardSerializer, LanguageSerializer
+    PatientDashboardSerializer, LanguageSerializer,
+    ChatSessionSerializer, ChatMessageSerializer
 )
 import logging
 
 logger = logging.getLogger(__name__)
-
 
 class PatientViewSet(viewsets.ViewSet):
     """Patient ViewSet using DatabaseService"""
@@ -439,3 +439,208 @@ class LanguageViewSet(viewsets.ViewSet):
         if not language:
             return Response({'error': 'Language not found'}, status=status.HTTP_404_NOT_FOUND)
         return Response(language)
+    
+
+
+from django.conf import settings
+from .rag_service import RAGService
+
+class ChatViewSet(viewsets.ViewSet):
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.rag_service = RAGService()
+        
+    def get_patient(self, request):
+        return DatabaseService.get_patient_by_user_id(request.user_id)
+
+    @action(detail=False, methods=["post"])
+    def start(self, request):
+        patient = self.get_patient(request)
+        session = DatabaseService.create_chat_session(patient['id'])
+
+        return Response({
+            "session": ChatSessionSerializer(session).data,
+        })
+
+    @action(detail=False, methods=['get'])
+    def sessions(self, request):
+        patient = self.get_patient(request)
+        sessions = DatabaseService.get_chat_sessions_by_patient(patient['id'])
+        serializer = ChatSessionSerializer(sessions, many=True)
+        return Response(serializer.data)
+
+    @action(detail=False, methods=["post"])
+    def load(self, request):
+        session_id = request.data.get("session_id")
+        if not session_id:
+            return Response({"error": "Session ID is required."}, status=400)
+
+        patient = self.get_patient(request)
+        session, messages = DatabaseService.get_session_and_messages(session_id, patient['id'])
+        if not session:
+            return Response({"error": "Session not found."}, status=404)
+        return Response({
+            "session": ChatSessionSerializer(session).data,
+            "messages": ChatMessageSerializer(messages, many=True).data,
+            "suggestions": ChatSessionSerializer(session).data.get('suggestions')
+        })
+
+   
+    @action(detail=False, methods=["post"])
+    def message(self, request):
+        user_message = (request.data.get("message") or "").strip()
+        session_id = request.data.get("session_id")
+
+
+        if not user_message:
+            return Response({"error": "Message is required"}, status=400)
+
+        patient = self.get_patient(request)
+        if not patient:
+            return Response({"error": "Patient not found"}, status=404)
+        preferred_language = (patient.get("preferred_language") or "English").strip()
+
+        if session_id:
+            session = DatabaseService.get_chat_session_by_id_and_patient(session_id, patient["id"])
+            logger.info(f"Loaded session {session_id} for patient {patient['id']} {session}")
+            if not session:
+                return Response({"error": "Invalid session ID"}, status=400)
+        else:
+            session = DatabaseService.get_latest_chat_session(patient["id"])
+            if not session:
+                session = DatabaseService.create_chat_session(patient["id"])
+                initialAssitantMessage = "Hello! I'm your medical assistant. I can help answer questions about your condition based on medical documents. How can I help you today?"
+                DatabaseService.create_chat_message(session["id"], "assistant",initialAssitantMessage)
+                
+        messages = DatabaseService.get_messages_for_session(session["id"])
+        chat_history = [{"role": "system", "content": (
+            "You are a helpful assistant for a patient dashboard following NCCN guidelines. "
+            f"Reply in {preferred_language}."
+        )}]
+        for msg in messages:
+            chat_history.append({"role": msg.role, "content": msg.content})
+
+        chat_history.append({"role": "user", "content": user_message})
+
+        try:
+            rough_token_count = sum(len(m["content"]) for m in chat_history) // 4
+            if rough_token_count > getattr(settings, "OPENAI_MAX_TOKENS_PER_CHUNK", 8000):
+                session = DatabaseService.create_chat_session(patient["id"])
+                chat_history = [
+                    {"role": "system", "content": (
+                        "You are a helpful assistant for a patient dashboard following NCCN guidelines. "
+                        f"Reply in {preferred_language}."
+                    )},
+                    {"role": "user", "content": user_message},
+                ]
+        except Exception as e:
+            logger.warning(f"Token guard calculation failed, proceeding anyway: {e}")
+
+        DatabaseService.create_chat_message(session["id"], "user", user_message)
+
+        # Cancer type + auth for RAG
+        try:
+            cancer_type = self._get_cancer_type(patient)
+        except Exception:
+            cancer_type = self.rag_service.FALLBACK_CANCER_TYPE  # 'uterine'
+
+        auth_token = (request.META.get("HTTP_AUTHORIZATION", "") or "").replace("Bearer ", "")
+        if not auth_token:
+            return Response({"error": "Authentication required"}, status=401)
+
+        # Call RAG (LangChain) service
+        try:
+            result = self.rag_service.query_with_context(
+                query=user_message,
+                cancer_type=cancer_type,
+                auth_token=auth_token,
+                session_id=session["id"],
+                chat_history=chat_history,
+            )
+            logger.info(f"RAG service returned: type={type(result)}, value={result}")
+        except Exception as e:
+            logger.exception("Exception calling RAG service")
+            return Response({"error": "Failed to generate response", "details": str(e)}, status=500)
+
+        # Normalize result
+        if not isinstance(result, dict):
+            logger.error(f"RAG returned non-dict: {type(result)} - {result}")
+            result = {
+                "success": False,
+                "response": "I apologize, but I encountered an error processing your request."
+            }
+
+        if result.get("success"):
+            reply = (result.get("answer") or result.get("response") or "").strip()
+        else:
+            reply = (result.get("response") or "I’m sorry—I couldn’t process that right now.").strip()
+
+        # Persist assistant reply
+        DatabaseService.create_chat_message(session["id"], "assistant", reply)
+
+        try:
+            if not session.get("title") or session["title"].strip() == "New Chat":
+                generated_title = (user_message[:25] or "Conversation").strip()
+                DatabaseService.update_session_title(session["id"], generated_title)
+        except Exception as e:
+            logger.warning(f"Title generation failed: {e}")
+
+
+        return Response(
+            {
+                "response": reply,
+                "session_id": session["id"],
+            },
+            status=status.HTTP_200_OK,
+        )
+    
+    @action(detail=True, methods=["delete"])
+    def delete(self, request, pk=None):
+        patient = self.get_patient(request)
+        success = DatabaseService.delete_chat_session(pk, patient['id'])
+        if success:
+            return Response({"message": "Session deleted."})
+        return Response({"error": "Delete failed or session not found."}, status=400)
+
+    @action(detail=False, methods=['get'])
+    def context(self, request):
+        """Get the current cancer type context for the patient"""
+        try:
+            patient = self._get_patient_info(request)
+            if not patient:
+                return Response(
+                    {'error': 'Patient profile not found'}, 
+                    status=status.HTTP_404_NOT_FOUND
+                )
+            
+            cancer_type = self._get_cancer_type(patient)
+            
+            return Response({
+                'cancer_type': cancer_type,
+                'is_fallback': cancer_type == 'uterine' and not self._patient_has_uterine_cancer(patient)
+            })
+            
+        except Exception as e:
+            logger.error(f"Error getting context: {str(e)}")
+            return Response(
+                {'error': 'Unable to determine context'}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+        
+    def _get_cancer_type(self, patient: dict) -> str:
+        """Extract cancer type from patient data with fallback"""
+        # Try to get cancer type from patient profile
+        cancer_type = patient.get('cancer_type', '').strip()
+        
+        if not cancer_type:
+            # Try to get from cancer_type_detail
+            cancer_detail = patient.get('cancer_type_detail', {})
+            if isinstance(cancer_detail, dict):
+                cancer_type = cancer_detail.get('name', '').strip()
+        
+        # Default to uterine if not found or empty
+        if not cancer_type:
+            logger.info(f"No cancer type found for patient {patient.get('id')}, using fallback")
+            cancer_type = 'uterine'
+    

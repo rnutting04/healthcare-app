@@ -20,6 +20,7 @@ router.register(r'medical-record-access', views.MedicalRecordAccessViewSet)
 # RAG Embedding viewsets
 router.register(r'rag/embeddings', views.RAGEmbeddingViewSet)
 router.register(r'rag/embedding-jobs', views.RAGEmbeddingJobViewSet)
+router.register(r'chat', views.ChatViewSet, basename='chat')
 
 urlpatterns = [
     path('', include(router.urls)),

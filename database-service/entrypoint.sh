@@ -28,6 +28,9 @@ python manage.py create_admin_user
 echo "Importing cancer types..."
 python manage.py import_cancer_types
 
+echo "Importing suggestions..."
+python manage.py import_suggestions
+
 # Start the server
 echo "Starting server..."
 exec "$@"
