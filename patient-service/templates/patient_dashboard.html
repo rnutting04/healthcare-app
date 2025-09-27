@@ -11,98 +11,123 @@
 
 {% block content %}
 <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-    <h2 class="text-2xl font-bold text-gray-900 mb-8">{% trans "Patient Dashboard" %}</h2>
+    <!-- Page Header -->
+    <div class="mb-8">
+        <h2 class="text-3xl font-semibold text-gray-900">{% trans "Patient Dashboard" %}</h2>
+        <p class="mt-2 text-sm text-gray-600">{% trans "Welcome back! Here's your health overview." %}</p>
+    </div>
     
-    <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
+    <!-- Stats Cards -->
+    <div class="grid grid-cols-1 gap-6 lg:grid-cols-3 mb-8">
         <!-- Upcoming Appointments -->
-        <div class="bg-white overflow-hidden shadow rounded-lg transform transition-all duration-200 hover:scale-105">
-            <div class="p-5">
+        <div class="bg-white overflow-hidden shadow-lg rounded-lg transform transition-all duration-200 hover:shadow-xl hover:-translate-y-1">
+            <div class="p-6">
                 <div class="flex items-center">
-                    <div class="flex-shrink-0">
+                    <div class="flex-shrink-0 bg-blue-100 rounded-lg p-3">
                         <svg class="h-6 w-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
                         </svg>
                     </div>
                     <div class="ml-5 w-0 flex-1">
-                        <dt class="text-sm font-medium text-gray-500 truncate">{% trans "Upcoming Appointments" %}</dt>
-                        <dd class="text-lg font-medium text-gray-900" id="appointmentCount">{% trans "Loading..." %}</dd>
+                        <dt class="text-sm font-normal text-gray-500 truncate">{% trans "Upcoming Appointments" %}</dt>
+                        <dd class="mt-1 text-2xl font-semibold text-gray-900" id="appointmentCount">0</dd>
                     </div>
                 </div>
             </div>
-            <div class="bg-gray-50 px-5 py-3">
-                <a href="/patient/appointments" class="text-sm font-medium text-blue-600 hover:text-blue-900">{% trans "View all" %}</a>
+            <div class="bg-gray-50 px-6 py-3">
+                <a href="/patient/appointments" class="text-sm font-medium text-blue-600 hover:text-blue-800 flex items-center">
+                    {% trans "View all" %}
+                    <svg class="ml-2 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                    </svg>
+                </a>
             </div>
         </div>
         
         <!-- Active Prescriptions -->
-        <div class="bg-white overflow-hidden shadow rounded-lg transform transition-all duration-200 hover:scale-105">
-            <div class="p-5">
+        <div class="bg-white overflow-hidden shadow-lg rounded-lg transform transition-all duration-200 hover:shadow-xl hover:-translate-y-1">
+            <div class="p-6">
                 <div class="flex items-center">
-                    <div class="flex-shrink-0">
+                    <div class="flex-shrink-0 bg-green-100 rounded-lg p-3">
                         <svg class="h-6 w-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
                         </svg>
                     </div>
                     <div class="ml-5 w-0 flex-1">
-                        <dt class="text-sm font-medium text-gray-500 truncate">{% trans "Active Prescriptions" %}</dt>
-                        <dd class="text-lg font-medium text-gray-900" id="prescriptionCount">{% trans "Loading..." %}</dd>
+                        <dt class="text-sm font-normal text-gray-500 truncate">{% trans "Active Prescriptions" %}</dt>
+                        <dd class="mt-1 text-2xl font-semibold text-gray-900" id="prescriptionCount">0</dd>
                     </div>
                 </div>
             </div>
-            <div class="bg-gray-50 px-5 py-3">
-                <a href="/patient/prescriptions" class="text-sm font-medium text-blue-600 hover:text-blue-900">{% trans "View all" %}</a>
+            <div class="bg-gray-50 px-6 py-3">
+                <a href="/patient/prescriptions" class="text-sm font-medium text-blue-600 hover:text-blue-800 flex items-center">
+                    {% trans "View all" %}
+                    <svg class="ml-2 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                    </svg>
+                </a>
             </div>
         </div>
         
         <!-- Recent Records -->
-        <div class="bg-white overflow-hidden shadow rounded-lg transform transition-all duration-200 hover:scale-105">
-            <div class="p-5">
+        <div class="bg-white overflow-hidden shadow-lg rounded-lg transform transition-all duration-200 hover:shadow-xl hover:-translate-y-1">
+            <div class="p-6">
                 <div class="flex items-center">
-                    <div class="flex-shrink-0">
+                    <div class="flex-shrink-0 bg-purple-100 rounded-lg p-3">
                         <svg class="h-6 w-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
                         </svg>
                     </div>
                     <div class="ml-5 w-0 flex-1">
-                        <dt class="text-sm font-medium text-gray-500 truncate">{% trans "Medical Records" %}</dt>
-                        <dd class="text-lg font-medium text-gray-900" id="recordCount">{% trans "Loading..." %}</dd>
+                        <dt class="text-sm font-normal text-gray-500 truncate">{% trans "Medical Records" %}</dt>
+                        <dd class="mt-1 text-2xl font-semibold text-gray-900" id="recordCount">0</dd>
                     </div>
                 </div>
             </div>
-            <div class="bg-gray-50 px-5 py-3">
-                <a href="/patient/records" class="text-sm font-medium text-blue-600 hover:text-blue-900">{% trans "View all" %}</a>
+            <div class="bg-gray-50 px-6 py-3">
+                <a href="/patient/medical-records" class="text-sm font-medium text-blue-600 hover:text-blue-800 flex items-center">
+                    {% trans "View all" %}
+                    <svg class="ml-2 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                    </svg>
+                </a>
             </div>
         </div>
     </div>
-       <!-- Talk with an AI Card -->
-    <div class="mt-8">
-        <h3 class="text-lg font-medium text-gray-900 mb-4">{% ctrans "Apps" %}</h3>
-        <div class="bg-white overflow-hidden shadow rounded-lg transform transition-all duration-200 hover:scale-105">
-            <div class="p-5">
+    
+    <!-- Talk with an AI Card -->
+    <div class="mb-8">
+        <h3 class="text-xl font-medium text-gray-900 mb-4">{% ctrans "Apps" %}</h3>
+        <div class="bg-white overflow-hidden shadow-lg rounded-lg transform transition-all duration-200 hover:shadow-xl hover:-translate-y-1">
+            <div class="p-6">
                 <div class="flex items-center">
-                    <div class="flex-shrink-0">
-                        <!-- Chat Icon SVG -->
+                    <div class="flex-shrink-0 bg-blue-100 rounded-lg p-3">
                         <svg class="h-6 w-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                 d="M7 8h10M7 12h6m-2 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
                         </svg>
                     </div>
                     <div class="ml-5 w-0 flex-1">
-                        <dt class="text-sm font-medium text-gray-500 truncate">{% ctrans "Talk with an AI" %}</dt>
-                        <dd class="text-lg font-medium text-gray-900">{% ctrans "AI Assistant" %}</dd>
+                        <dt class="text-sm font-normal text-gray-500 truncate">{% ctrans "Talk with an AI" %}</dt>
+                        <dd class="mt-1 text-lg font-medium text-gray-900">{% ctrans "AI Assistant" %}</dd>
                     </div>
                 </div>
             </div>
-            <div class="bg-gray-50 px-5 py-3">
-                <a href="/patient/chat" class="text-sm font-medium text-blue-600 hover:text-blue-900">{% ctrans "Start chatting" %}</a>
+            <div class="bg-gray-50 px-6 py-3">
+                <a href="/patient/chat" class="text-sm font-medium text-blue-600 hover:text-blue-800 flex items-center">
+                    {% ctrans "Start chatting" %}
+                    <svg class="ml-2 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                    </svg>
+                </a>
             </div>
         </div>
     </div>
-</div>
+    
     <!-- Recent Activity -->
-    <div class="mt-8">
-        <h3 class="text-lg font-medium text-gray-900 mb-4">{% trans "Recent Activity" %}</h3>
-        <div class="bg-white shadow overflow-hidden sm:rounded-md">
+    <div>
+        <h3 class="text-xl font-medium text-gray-900 mb-4">{% trans "Recent Activity" %}</h3>
+        <div class="bg-white shadow-lg rounded-lg overflow-hidden">
             <ul class="divide-y divide-gray-200" id="recentActivity">
                 <li class="px-4 py-4">
                     <p class="text-sm text-gray-500">{% trans "Loading recent activity..." %}</p>
@@ -111,112 +136,8 @@
         </div>
     </div>
 </div>
-
-  {# CTRANS TEST #}
-    <div class="mt-8 p-4 bg-blue-100 border-l-4 border-blue-500 text-blue-800">
-      <p class="font-bold">{%ctrans "A Note From Your Doctor:" %}</p>
-      <p>{%ctrans "An apple a day keeps the doctor away" %}</p>
-</p>
-    </div>
 {% endblock %}
 
 {% block extra_scripts %}
-<script>
-async function loadDashboard() {
-    try {
-        // Check if we have a token
-        const token = localStorage.getItem('access_token');
-        if (!token) {
-            console.error('No access token found - redirecting to login');
-            window.location.href = '/login/?next=/patient/dashboard/';
-            return;
-        }
-        
-        console.log('Token found:', token ? 'Yes (length: ' + token.length + ')' : 'No');
-        
-        const response = await fetch('/api/patients/profiles/dashboard/', {
-            method: 'GET',
-            headers: {
-                'Authorization': 'Bearer ' + token,
-                'Content-Type': 'application/json'
-            }
-        });
-        
-        if (!response.ok) {
-            console.error('Dashboard API error:', response.status, response.statusText);
-            throw new Error('Failed to load dashboard');
-        }
-        
-        const data = await response.json();
-        
-        // Update counts
-        document.getElementById('appointmentCount').textContent = data.upcoming_appointments.length;
-        document.getElementById('prescriptionCount').textContent = data.active_prescriptions.length;
-        document.getElementById('recordCount').textContent = data.recent_records.length;
-        
-        // Update recent activity
-        const activityList = document.getElementById('recentActivity');
-        activityList.innerHTML = '';
-        
-        // Add appointments to activity
-        data.upcoming_appointments.forEach(appointment => {
-            const date = new Date(appointment.appointment_date);
-            const li = document.createElement('li');
-            li.className = 'px-4 py-4 hover:bg-gray-50';
-            li.innerHTML = `
-                <div class="flex items-center justify-between">
-                    <div>
-                        <p class="text-sm font-medium text-gray-900">
-                            Appointment with ${appointment.clinician_name}
-                        </p>
-                        <p class="text-sm text-gray-500">
-                            ${date.toLocaleDateString()} at ${date.toLocaleTimeString()}
-                        </p>
-                    </div>
-                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                        ${appointment.status}
-                    </span>
-                </div>
-            `;
-            activityList.appendChild(li);
-        });
-        
-        // Add recent records to activity
-        data.recent_records.forEach(record => {
-            const date = new Date(record.created_at);
-            const li = document.createElement('li');
-            li.className = 'px-4 py-4 hover:bg-gray-50';
-            li.innerHTML = `
-                <div class="flex items-center justify-between">
-                    <div>
-                        <p class="text-sm font-medium text-gray-900">
-                            ${record.title}
-                        </p>
-                        <p class="text-sm text-gray-500">
-                            ${record.record_type} - ${date.toLocaleDateString()}
-                        </p>
-                    </div>
-                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
-                        ${record.record_type}
-                    </span>
-                </div>
-            `;
-            activityList.appendChild(li);
-        });
-        
-        if (activityList.children.length === 0) {
-            activityList.innerHTML = '<li class="px-4 py-4"><p class="text-sm text-gray-500">{%ctrans "No recent activity" %}</p></li>';
-        }
-        
-    } catch (error) {
-        console.error('Error loading dashboard:', error);
-        // For now, just show placeholder data
-        document.getElementById('appointmentCount').textContent = '0';
-        document.getElementById('prescriptionCount').textContent = '0';
-        document.getElementById('recordCount').textContent = '0';
-        document.getElementById('recentActivity').innerHTML = '<li class="px-4 py-4"><p class="text-sm text-gray-500">{%ctrans "No recent activity" %}</p></li>';
-    }
-}
-
-</script>
+<script src="{% static 'js/patient-dashboard.js' %}"></script>
 {% endblock %}

@@ -11,7 +11,7 @@ def patient_appointments(request):
 
 @ensure_csrf_cookie
 def patient_records(request):
-    return render(request, 'patient_records.html')
+    return render(request, 'medical_records.html')
 
 @ensure_csrf_cookie  
 def patient_prescriptions(request):
@@ -24,3 +24,7 @@ def patient_profile_edit(request):
 @ensure_csrf_cookie
 def patient_chat(request):
     return render(request, 'chat_bot.html')
+
+@ensure_csrf_cookie
+def patient_medical_records(request):
+    return render(request, 'medical_records.html')

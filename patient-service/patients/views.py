@@ -362,6 +362,12 @@ class MedicalRecordViewSet(viewsets.ViewSet):
         records = DatabaseService.get_medical_records(params)
         return Response(records)
     
+    @action(detail=False, methods=['get'])
+    def record_types(self, request):
+        """Get all available medical record types"""
+        record_types = DatabaseService.get_medical_record_types()
+        return Response(record_types)
+    
     def retrieve(self, request, pk=None):
         """Get specific medical record"""
         record = DatabaseService.get_medical_record(pk)
