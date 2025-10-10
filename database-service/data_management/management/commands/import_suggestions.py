@@ -87,7 +87,7 @@ class Command(BaseCommand):
                 self.stdout.write(self.style.SUCCESS("Cleared existing suggestion templates"))
 
             for block in blocks:
-                cancer_type = (block.get("cancer_type_name") or "").strip().lower()
+                cancer_type = (block.get("cancer_type_name") or block.get("cancer_type") or "").strip().lower()
                 questions = block.get("questions") or []
                 if not cancer_type or not questions:
                     continue

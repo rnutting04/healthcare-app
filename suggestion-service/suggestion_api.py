@@ -39,12 +39,8 @@ def suggest(body: SuggestReq, user=Depends(require_jwt)):
     if not user_token:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid auth context")
 
-    cancer_type = (body.cancer_type or "uterine").lower().strip()
+    cancer_type = (body.cancer_type or "Uterine Cancer").strip()
     log.info(f"Suggesting for cancer type {cancer_type}")
-
-    # TODO: remove this once we have adenosarcoma subtypes or subtype to main cancer type mapping
-    if cancer_type == 'adenosarcoma':
-        cancer_type = 'uterine'
 
     # 1) latest user message to drive similarity
     try:

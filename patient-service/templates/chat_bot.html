@@ -130,7 +130,8 @@ const pushMsg = (role, content) => {
 let token = localStorage.getItem('access_token');
 let sessionId = null;
 let activeButton = null;
-let cancerType = null;
+let mainCancerType = null;
+let subCancerType = null;
 let preferredLanguage = null;
 
 const TRANSLATE_URL = "/api/translate/";     // POST /translate/
@@ -328,11 +329,12 @@ async function loadChatContext() {
             if (response.ok) {
                 const data = await response.json();
                 preferredLanguage = data.language;
-                cancerType = data.cancer_type.charAt(0).toUpperCase() + data.cancer_type.slice(1);
-                contextBadge.textContent = `${cancerType} Cancer${data.is_fallback ? ' (Default)' : ''}`;
+                mainCancerType = data.main_cancer_type;
+                subCancerType = data.sub_cancer_type;
+                contextBadge.textContent = `${subCancerType} Cancer${data.is_fallback ? ' (Default)' : ''}`;
                 contextBadge.title = data.is_fallback 
                     ? 'Using general uterine cancer information' 
-                    : `Using ${cancerType} cancer specific information`;
+                    : `Using ${subCancerType} cancer specific information`;
             }
         } catch (error) {
             console.error('Error loading chat context:', error);
@@ -494,7 +496,7 @@ async function sendMessage(message) {
                 },
                 body: JSON.stringify({
                 session_id: sessionId,
-                cancer_type: cancerType
+                cancer_type: mainCancerType
                 })
               });
               const sdata = await sres.json();

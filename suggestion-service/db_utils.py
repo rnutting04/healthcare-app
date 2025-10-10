@@ -27,7 +27,7 @@ def db_last_messages(session_id: str, user_token: str, limit: int = 5) -> List[d
 
 def db_templates(cancer_type: str, user_token: str) -> Tuple[List[int], List[str], np.ndarray]:
     url = f"{DB_URL}/internal/suggestions/templates/"
-    r = requests.get(url, params={"cancer_type": cancer_type},
+    r = requests.get(url, params={"cancer_type_name": cancer_type},
                      headers=user_headers(user_token), timeout=TIMEOUT)
     r.raise_for_status()
     rows = r.json() or []
