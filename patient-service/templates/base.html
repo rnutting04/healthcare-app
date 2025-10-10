@@ -102,7 +102,7 @@
                     <span class="text-gray-300">&copy; 2025 {% trans "Healthcare Portal" %}</span>
                     <a href="/patient/dashboard" class="text-gray-300 hover:text-white transition-colors">{% trans "Dashboard" %}</a>
                     <a href="/patient/appointments" class="text-gray-300 hover:text-white transition-colors">{% trans "Appointments" %}</a>
-                    <a href="/patient/records" class="text-gray-300 hover:text-white transition-colors">{% trans "Records" %}</a>
+                    <a href="/patient/medical-records" class="text-gray-300 hover:text-white transition-colors">{% trans "Medical Records" %}</a>
                     <a href="/patient/prescriptions" class="text-gray-300 hover:text-white transition-colors">{% trans "Prescriptions" %}</a>
                 </div>
                 
@@ -139,8 +139,10 @@
 
     // wait until the entire HTML page is fully loaded before running any code
     document.addEventListener('DOMContentLoaded', () => {
-        // call the function  to load the main dashboard via API
-        loadDashboard();
+        // call the function  to load the main dashboard via API (only if it exists)
+        if (typeof loadDashboard === 'function') {
+            loadDashboard();
+        }
 
         // --- CTRANS WebSocket Logic ---
         function startTranslationSocket() {
