@@ -164,7 +164,7 @@ class ChatService:
     @classmethod
     def process_query(cls, query: str, cancer_type_id: Optional[int], 
                      session_id: Optional[str], user_id: int,
-                     ip_address: str, user_agent: str) -> Dict[str, Any]:
+                     ip_address: str, user_agent: str, language: str) -> Dict[str, Any]:
         """Process a RAG query"""
         # Get session history
         chat_history = cls.get_session_history(session_id)
@@ -172,6 +172,7 @@ class ChatService:
         # Process with LangChain
         result = process_rag_query(
             query=query,
+            language=language,
             cancer_type_id=cancer_type_id,
             chat_history=chat_history,
             k=8  # Use more results for better context

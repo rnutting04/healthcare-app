@@ -55,7 +55,7 @@ class RAGService:
     
     def query_with_context(self, query: str, cancer_type: str, auth_token: str, 
                           session_id: Optional[str] = None, 
-                          chat_history: Optional[List] = None) -> Dict[str, Any]:
+                          chat_history: Optional[List] = None, language: str = 'English') -> Dict[str, Any]:
         """
         Query RAG system with patient's cancer type context and session support
         
@@ -69,6 +69,7 @@ class RAGService:
         Returns:
             Dict containing the RAG response
         """
+        logger.info(f"RAG query with context: {language}, {cancer_type}, {query}")
         headers = {'Authorization': f'Bearer {auth_token}'}
         
         # Generate session ID if not provided
@@ -77,8 +78,10 @@ class RAGService:
         
         # For now, we'll pass None as cancer_type_id to get all results
         # In production, you'd want to map cancer type names to IDs
+
         data = {
             'query': query,
+            'language': language,
             'cancer_type_id': None,  # Will search across all cancer types
             'session_id': session_id,
             'chat_history': chat_history or [],

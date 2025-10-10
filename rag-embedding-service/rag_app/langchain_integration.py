@@ -29,9 +29,10 @@ Instructions:
 - Use clear, easy-to-understand language
 - If specific medical terms are used, briefly explain them
 - If the context doesn't contain enough information to fully answer the question, acknowledge this
+- Always answer in {language}
 
 Answer:""",
-    input_variables=["context", "question"]
+    input_variables=["context", "question", "language"]
 )
 
 
@@ -107,22 +108,28 @@ class RAGChain:
             max_tokens=500
         )
         self.retriever = CustomRetriever(cancer_type_id=cancer_type_id, k=k)
-        self.qa_chain = self._create_chain()
+        self.prompt_template = MEDICAL_QA_PROMPT
+        self.qa_chain = None
     
-    def _create_chain(self):
+    def _create_chain(self, prompt: PromptTemplate):
         """Create the QA chain"""
         return RetrievalQA.from_chain_type(
             llm=self.llm,
             chain_type="stuff",
             retriever=self.retriever,
             return_source_documents=True,
-            chain_type_kwargs={"prompt": MEDICAL_QA_PROMPT}
+            chain_type_kwargs={"prompt": prompt,
+                               "document_variable_name": "context"}
         )
     
-    def query(self, question: str, chat_history: List = None) -> Dict[str, Any]:
+    def query(self, question: str, chat_history: List = None, language: str = 'English') -> Dict[str, Any]:
         """Process a query with optional chat history"""
         # Add chat history context if available
-        full_query = self._build_query_with_history(question, chat_history)
+        prompt = self.prompt_template.partial(language=language)
+        logger.info(f"languagakjdhaksjhakjdh {language}")
+        logger.info(f"query {question}")
+        self.qa_chain = self._create_chain(prompt)
+        full_query = self._build_query_with_history(question, chat_history, language)
         
         # Run the chain
         try:
@@ -136,11 +143,11 @@ class RAGChain:
         if isinstance(result, str):
             result = {"result": result, "source_documents": []}
         
-        # Extract and format response
+        # Extract and format respons
         return self._format_response(result, question)
     
     @staticmethod
-    def _build_query_with_history(question: str, chat_history: List) -> str:
+    def _build_query_with_history(question: str, chat_history: List, language: str) -> str:
         """Build query with chat history context"""
         if not chat_history:
             return question
@@ -214,12 +221,14 @@ class RAGChain:
 
 
 def process_rag_query(query: str, cancer_type_id: Optional[int] = None,
-                     chat_history: List = None, k: int = 5) -> Dict[str, Any]:
+                     chat_history: List = None, k: int = 5, language: str = 'English') -> Dict[str, Any]:
     """Main entry point for processing RAG queries"""
     try:
         # Create and run chain
+        logger.info(language)
         rag_chain = RAGChain(cancer_type_id=cancer_type_id, k=max(k, 5))
-        result = rag_chain.query(query, chat_history)
+        
+        result = rag_chain.query(query, chat_history, language)
         
         # Add raw results for compatibility
         result['raw_results'] = query_embeddings(query, cancer_type_id, k)

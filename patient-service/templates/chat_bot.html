@@ -131,6 +131,71 @@ let token = localStorage.getItem('access_token');
 let sessionId = null;
 let activeButton = null;
 let cancerType = null;
+let preferredLanguage = null;
+
+const TRANSLATE_URL = "/api/translate/";     // POST /translate/
+const RESULT_URL    = "/api/result";         // GET  /result/{id}
+
+async function translateText(text, targetLang, token, {timeoutMs=10000, pollEveryMs=500} = {}) {
+  if (targetLang == "en") {
+    return text;
+  }
+  if (!text || !targetLang) return text;
+
+  const res = await fetch(TRANSLATE_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${token}`,
+    },
+    body: JSON.stringify({ text, target_language: targetLang })
+  });
+
+  // Cache hit (200)
+  if (res.status === 200) {
+    const data = await res.json();
+    return data?.result ?? text;
+  }
+
+  // Accepted (202): poll /result/{request_id}
+  if (res.status === 202) {
+    const data = await res.json(); // { request_id: "..." }
+    const id = data?.request_id;
+    if (!id) return text;
+
+    const started = Date.now();
+    while (Date.now() - started < timeoutMs) {
+      await new Promise(r => setTimeout(r, pollEveryMs));
+      const r2 = await fetch(`${RESULT_URL}/${encodeURIComponent(id)}`, {
+        headers: {"Authorization": `Bearer ${token}`}
+      });
+
+      if (r2.status === 200) {
+        const body = await r2.json(); // { status: 'in_progress'|'completed'|'failed', result }
+        if (body.status === "completed") return body.result ?? text;
+        if (body.status === "failed") return text; // fallback
+      } else if (r2.status === 404) {
+        // not ready yet or expired; keep polling until timeout
+      }
+    }
+    return text; // timeout fallback
+  }
+
+  // Unknown / error
+  return text;
+}
+
+async function translateArray(texts, targetLang, token) {
+  const uniq = [...new Set(texts.filter(Boolean))];
+  const map = new Map();
+  await Promise.all(
+    uniq.map(async (t) => {
+      const tt = await translateText(t, targetLang, token);
+      map.set(t, tt);
+    })
+  );
+  return texts.map(t => map.get(t) ?? t);
+}
 
 function scrollToBottom() {
     chatBox.scrollTop = chatBox.scrollHeight;
@@ -184,7 +249,10 @@ function renderSessionButton(session) {
         loadSessions();
         chatBox.innerHTML = ''
         sessionId = null
-        appendMessage("assistant", initialMessage);
+        translateText(initialMessage, preferredLanguage, token).then(translated => {
+            appendMessage("assistant", translated);
+        });
+
     };
 
     btn.appendChild(titleSpan);
@@ -250,7 +318,7 @@ function appendMessage(role, content) {
 async function loadChatContext() {
         try {
             const token = localStorage.getItem('access_token');
-            const response = await fetch('/api/patients/rag-chat/context/', {
+            const response = await fetch('/api/patients/chat/context/', {
                 headers: {
                     'Authorization': 'Bearer ' + token,
                     'Content-Type': 'application/json'
@@ -259,6 +327,8 @@ async function loadChatContext() {
             
             if (response.ok) {
                 const data = await response.json();
+                console.log(data)
+                preferredLanguage = data.language;
                 cancerType = data.cancer_type.charAt(0).toUpperCase() + data.cancer_type.slice(1);
                 contextBadge.textContent = `${cancerType} Cancer${data.is_fallback ? ' (Default)' : ''}`;
                 contextBadge.title = data.is_fallback 
@@ -312,7 +382,9 @@ async function loadSession(id) {
         for (const msg of data.messages) {
             bubble = appendMessage(msg.role, msg.content);
         }
-        renderSuggestionsUnderGroup(bubble, data.suggestions);
+      const localized = await translateArray(data.suggestions, preferredLanguage, token);
+
+      renderSuggestionsUnderGroup(bubble, localized);
     } else {
         console.error("Failed to load session");
     }
@@ -355,8 +427,8 @@ function clearAllSuggestions() {
 }
 
 function renderSuggestionsUnderGroup(groupEl, suggestions) {
+   
   if (!groupEl || !suggestions?.length) return;
-
   // remove any existing suggestions under this group (safety)
   groupEl.querySelector('.suggestions-row')?.remove();
 
@@ -431,8 +503,9 @@ async function sendMessage(message) {
               });
               const sdata = await sres.json();
               const suggestions = (sdata.top_4 || []).slice(0, 4);
+              const localized = await translateArray(suggestions, preferredLanguage, token);
 
-              renderSuggestionsUnderGroup(bubbleEl, suggestions);
+              renderSuggestionsUnderGroup(bubbleEl, localized);
               scrollToBottom();
             } catch (e) {
               // optional fallback for POC
@@ -461,7 +534,9 @@ document.addEventListener("DOMContentLoaded", async () =>{
     if (sessionId){
         await loadSession(sessionId);
     } else {
-        appendMessage("assistant", initialMessage);
+        translateText(initialMessage, preferredLanguage, token).then(translated => {
+            appendMessage("assistant", translated);
+        });
     }
     
 
@@ -488,8 +563,9 @@ document.addEventListener("DOMContentLoaded", async () =>{
     newChatButton.addEventListener("click", async () => {
         chatBox.innerHTML = ''
         sessionId = null
-        appendMessage("assistant", initialMessage);
-
+        translateText(initialMessage, preferredLanguage, token).then(translated => {
+            appendMessage("assistant", translated);
+        });
     });
     
 });

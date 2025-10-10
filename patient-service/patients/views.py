@@ -13,6 +13,16 @@ from .serializers import (
 import logging
 
 logger = logging.getLogger(__name__)
+LANGUAGE_MAP = {
+            "en": "English",
+            "es": "Spanish",
+            "fr": "French",
+            "de": "German",
+            "it": "Italian",
+            "pt": "Portuguese",
+            "ru": "Russian",
+            "zh": "Chinese",
+        }
 
 class PatientViewSet(viewsets.ViewSet):
     """Patient ViewSet using DatabaseService"""
@@ -500,6 +510,7 @@ class ChatViewSet(viewsets.ViewSet):
         if not patient:
             return Response({"error": "Patient not found"}, status=404)
         preferred_language = (patient.get("preferred_language") or "English").strip()
+        logger.info(f"Preferred language for patient {patient['id']} is {preferred_language}")
 
         if session_id:
             session = DatabaseService.get_chat_session_by_id_and_patient(session_id, patient["id"])
@@ -516,7 +527,7 @@ class ChatViewSet(viewsets.ViewSet):
         messages = DatabaseService.get_messages_for_session(session["id"])
         chat_history = [{"role": "system", "content": (
             "You are a helpful assistant for a patient dashboard following NCCN guidelines. "
-            f"Reply in {preferred_language}."
+            f"Reply in patients preferred language {preferred_language}."
         )}]
         for msg in messages:
             chat_history.append({"role": msg.role, "content": msg.content})
@@ -549,10 +560,11 @@ class ChatViewSet(viewsets.ViewSet):
         if not auth_token:
             return Response({"error": "Authentication required"}, status=401)
 
-        # Call RAG (LangChain) service
+        #Call RAG (LangChain) service
         try:
             result = self.rag_service.query_with_context(
                 query=user_message,
+                language=LANGUAGE_MAP.get(preferred_language, "English"),
                 cancer_type=cancer_type,
                 auth_token=auth_token,
                 session_id=session["id"],
@@ -607,7 +619,7 @@ class ChatViewSet(viewsets.ViewSet):
     def context(self, request):
         """Get the current cancer type context for the patient"""
         try:
-            patient = self._get_patient_info(request)
+            patient = self.get_patient(request)
             if not patient:
                 return Response(
                     {'error': 'Patient profile not found'}, 
@@ -616,9 +628,13 @@ class ChatViewSet(viewsets.ViewSet):
             
             cancer_type = self._get_cancer_type(patient)
             
+            preferred_language = patient.get('preferred_language', 'English')
+            logger.info(f"Preferred language for patient {patient['id']} is {preferred_language}")
+            
             return Response({
+                'language': preferred_language,
                 'cancer_type': cancer_type,
-                'is_fallback': cancer_type == 'uterine' and not self._patient_has_uterine_cancer(patient)
+                'is_fallback': cancer_type == 'uterine' 
             })
             
         except Exception as e:
@@ -643,4 +659,6 @@ class ChatViewSet(viewsets.ViewSet):
         if not cancer_type:
             logger.info(f"No cancer type found for patient {patient.get('id')}, using fallback")
             cancer_type = 'uterine'
+
+        return cancer_type
     

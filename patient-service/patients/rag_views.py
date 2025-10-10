@@ -225,8 +225,11 @@ class RAGChatViewSet(viewsets.ViewSet):
             
             cancer_type = self._get_cancer_type(patient)
             
+            preferred_language = patient.get('preferred_language', 'English')
+            
             return Response({
                 'cancer_type': cancer_type,
+                'language': preferred_language,
                 'is_fallback': cancer_type == 'uterine' and not self._patient_has_uterine_cancer(patient)
             })
             

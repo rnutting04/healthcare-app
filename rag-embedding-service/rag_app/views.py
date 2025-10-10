@@ -104,6 +104,7 @@ def query_rag(request):
     result = ChatService.process_query(
         query=query,
         cancer_type_id=cancer_type_id,
+        language=request.data.get('language', 'English'),
         session_id=session_id,
         user_id=request.user_id,
         ip_address=request.META.get('REMOTE_ADDR'),
