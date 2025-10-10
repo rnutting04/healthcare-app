@@ -1,18 +1,15 @@
-import os
-import json
 import logging
-from typing import List, Tuple
 import hashlib
 import numpy as np
-import requests
 from fastapi import FastAPI, Depends, HTTPException, status
 from pydantic import BaseModel
-from model import MODEL, USED_SIM_THRESHOLD
 from auth import require_jwt  # should return {"token": <raw user jwt>, "claims": {...}}
 from db_utils import db_last_messages, db_templates, db_history, db_set_last4
+from model import MODEL, USED_SIM_THRESHOLD
 
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("suggestion-service")
+
 
 app = FastAPI(title="Suggestion Service")
 
@@ -43,6 +40,11 @@ def suggest(body: SuggestReq, user=Depends(require_jwt)):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid auth context")
 
     cancer_type = (body.cancer_type or "uterine").lower().strip()
+    log.info(f"Suggesting for cancer type {cancer_type}")
+
+    # TODO: remove this once we have adenosarcoma subtypes or subtype to main cancer type mapping
+    if cancer_type == 'adenosarcoma':
+        cancer_type = 'uterine'
 
     # 1) latest user message to drive similarity
     try:

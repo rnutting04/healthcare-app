@@ -345,7 +345,7 @@ function downloadOCRResults(jobId, result) {
 ========================================
 Job ID: ${jobId}
 File: ${result.file_name || 'Unknown'}
-Confidence Score: ${(result.confidence_score || 0).toFixed(1)}%
+Confidence Score: ${(result.confidence_score || 0).toFixed(1)}
 Page Count: ${result.page_count || 0}
 Processing Time: ${(result.processing_time || 0).toFixed(1)} seconds
 Model Used: ${result.model_used || 'Unknown'}

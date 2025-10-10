@@ -1,8 +1,9 @@
-from rest_framework import viewsets, status, permissions
+from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from django.utils import timezone
 from datetime import datetime, timedelta
+import logging
 from .services import DatabaseService
 from .serializers import (
     PatientSerializer, AppointmentSerializer, 
@@ -10,7 +11,6 @@ from .serializers import (
     PatientDashboardSerializer, LanguageSerializer,
     ChatSessionSerializer, ChatMessageSerializer
 )
-import logging
 
 logger = logging.getLogger(__name__)
 LANGUAGE_MAP = {
@@ -510,11 +510,9 @@ class ChatViewSet(viewsets.ViewSet):
         if not patient:
             return Response({"error": "Patient not found"}, status=404)
         preferred_language = (patient.get("preferred_language") or "English").strip()
-        logger.info(f"Preferred language for patient {patient['id']} is {preferred_language}")
 
         if session_id:
             session = DatabaseService.get_chat_session_by_id_and_patient(session_id, patient["id"])
-            logger.info(f"Loaded session {session_id} for patient {patient['id']} {session}")
             if not session:
                 return Response({"error": "Invalid session ID"}, status=400)
         else:
@@ -570,7 +568,6 @@ class ChatViewSet(viewsets.ViewSet):
                 session_id=session["id"],
                 chat_history=chat_history,
             )
-            logger.info(f"RAG service returned: type={type(result)}, value={result}")
         except Exception as e:
             logger.exception("Exception calling RAG service")
             return Response({"error": "Failed to generate response", "details": str(e)}, status=500)
@@ -629,12 +626,11 @@ class ChatViewSet(viewsets.ViewSet):
             cancer_type = self._get_cancer_type(patient)
             
             preferred_language = patient.get('preferred_language', 'English')
-            logger.info(f"Preferred language for patient {patient['id']} is {preferred_language}")
             
             return Response({
                 'language': preferred_language,
                 'cancer_type': cancer_type,
-                'is_fallback': cancer_type == 'uterine' 
+                'is_fallback': cancer_type == 'none' 
             })
             
         except Exception as e:
@@ -647,18 +643,19 @@ class ChatViewSet(viewsets.ViewSet):
     def _get_cancer_type(self, patient: dict) -> str:
         """Extract cancer type from patient data with fallback"""
         # Try to get cancer type from patient profile
-        cancer_type = patient.get('cancer_type', '').strip()
+        assignment = patient.get('assignment')
+        cancer_type = assignment['cancer_subtype_name']
         
         if not cancer_type:
             # Try to get from cancer_type_detail
             cancer_detail = patient.get('cancer_type_detail', {})
             if isinstance(cancer_detail, dict):
                 cancer_type = cancer_detail.get('name', '').strip()
+        logger.info(f"Extracted cancer type {cancer_type} from patient data")
         
         # Default to uterine if not found or empty
         if not cancer_type:
-            logger.info(f"No cancer type found for patient {patient.get('id')}, using fallback")
-            cancer_type = 'uterine'
+            cancer_type = 'none'
 
         return cancer_type
     

@@ -6,7 +6,7 @@ ENV PIP_NO_CACHE_DIR=1 \
     PYTHONUNBUFFERED=1 \
     HF_HOME=/models_cache \
     TRANSFORMERS_CACHE=/models_cache \
-    TOKENIZERS_PARALLELISM=false
+    TOKENIZERS_PARALLELISM=false 
 
 WORKDIR /app
 

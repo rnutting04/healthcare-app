@@ -130,7 +130,6 @@ async function loadDashboard() {
             return;
         }
         
-        console.log('Token found:', token ? 'Yes (length: ' + token.length + ')' : 'No');
         
         const response = await fetch('/api/patients/profiles/dashboard/', {
             method: 'GET',

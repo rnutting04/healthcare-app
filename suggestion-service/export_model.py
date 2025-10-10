@@ -34,4 +34,4 @@ onnx_converter = OnnxConverter(
 )
 
 # Run export
-onnx_converter.export(output_dir=output_dir)
+onnx_converter.export(output_dir=output_dir, show_progress_bar=False)

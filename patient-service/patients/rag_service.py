@@ -69,7 +69,6 @@ class RAGService:
         Returns:
             Dict containing the RAG response
         """
-        logger.info(f"RAG query with context: {language}, {cancer_type}, {query}")
         headers = {'Authorization': f'Bearer {auth_token}'}
         
         # Generate session ID if not provided

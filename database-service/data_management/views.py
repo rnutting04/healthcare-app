@@ -1305,8 +1305,8 @@ class ChatViewSet(viewsets.ViewSet):
         session.suggestions = suggestions
         session.save(update_fields=['suggestions'])
         return Response({'success': True})
-
     @action(detail=False, methods=['get'], url_path='internal/sessions/last-messages')
+
     def internal_last_messages(self, request):
         sid = request.query_params.get('session_id')
         limit = int(request.query_params.get('limit', 5))
@@ -1350,3 +1350,19 @@ class ChatViewSet(viewsets.ViewSet):
         session.save(update_fields=['suggestions'])
         return Response({'success': True}, status=200)
 
+    @action(detail=False, methods=['post'], url_path='internal/suggestions/upsert-embeddings',
+            permission_classes=[permissions.IsAuthenticated])
+    def internal_upsert_embeddings(self, request):
+        items = request.data.get('items') or []  # [{id, embedding}]
+        if not isinstance(items, list):
+            return Response({'error':'items must be a list'}, status=400)
+
+        # (No session ownership required here; it’s template data.)
+        updated = 0
+        for it in items:
+            sid = it.get('id'); emb = it.get('embedding')
+            if sid is None or emb is None: 
+                continue
+            SuggestionTemplate.objects.filter(id=sid).update(embedding_json=emb)
+            updated += 1
+        return Response({'updated': updated}, status=200)

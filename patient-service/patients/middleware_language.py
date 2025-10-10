@@ -21,12 +21,10 @@ class UserLanguageMiddleware:
         # Try to get the user's preferred language
         try:
             patient = DatabaseService.get_patient_by_user_id(request.user_id)
-            logger.info(f"Patient data for user {request.user_id}: {patient}")
             
             if patient and patient.get('preferred_language'):
                 # Use the language code directly
                 language_code = patient['preferred_language']
-                logger.info(f"Setting language to: {language_code}")
                 translation.activate(language_code)
                 request.LANGUAGE_CODE = language_code
             else:

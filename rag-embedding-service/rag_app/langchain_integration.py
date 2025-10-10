@@ -126,8 +126,6 @@ class RAGChain:
         """Process a query with optional chat history"""
         # Add chat history context if available
         prompt = self.prompt_template.partial(language=language)
-        logger.info(f"languagakjdhaksjhakjdh {language}")
-        logger.info(f"query {question}")
         self.qa_chain = self._create_chain(prompt)
         full_query = self._build_query_with_history(question, chat_history, language)
         
@@ -225,7 +223,6 @@ def process_rag_query(query: str, cancer_type_id: Optional[int] = None,
     """Main entry point for processing RAG queries"""
     try:
         # Create and run chain
-        logger.info(language)
         rag_chain = RAGChain(cancer_type_id=cancer_type_id, k=max(k, 5))
         
         result = rag_chain.query(query, chat_history, language)
@@ -233,7 +230,6 @@ def process_rag_query(query: str, cancer_type_id: Optional[int] = None,
         # Add raw results for compatibility
         result['raw_results'] = query_embeddings(query, cancer_type_id, k)
         
-        logger.info(f"Successfully processed query: '{query[:50]}...'")
         return result
         
     except Exception as e:

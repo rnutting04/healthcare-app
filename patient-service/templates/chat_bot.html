@@ -327,7 +327,6 @@ async function loadChatContext() {
             
             if (response.ok) {
                 const data = await response.json();
-                console.log(data)
                 preferredLanguage = data.language;
                 cancerType = data.cancer_type.charAt(0).toUpperCase() + data.cancer_type.slice(1);
                 contextBadge.textContent = `${cancerType} Cancer${data.is_fallback ? ' (Default)' : ''}`;
@@ -470,7 +469,6 @@ async function sendMessage(message) {
               </div>`;
             chatBox.appendChild(typingElement);
             scrollToBottom();
-            console.log("sessionId", sessionId)
             const res = await fetch("/api/patients/chat/message/", {
                 method: "POST",
                 headers: {
@@ -483,13 +481,11 @@ async function sendMessage(message) {
                 })
             });
             const data = await res.json();
-            console.log(data.response)
             const bubbleEl = appendMessage("assistant", data.response || data.error);
             sessionId = data.session_id;
             try {
               // Build last 5 messages as "role: text" (user/assistant)
               const last5 = convo.slice(-5).map(m => `${m.role}: ${m.content}`);
-              console.log(cancerType)
               const sres = await fetch("/api/suggest/", {
                 method: "POST",
                 headers: {  
