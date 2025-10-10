@@ -132,9 +132,26 @@ class DatabaseService:
     def get_medical_records(params: Optional[Dict] = None) -> List[Dict[str, Any]]:
         """Get medical records with optional filters"""
         try:
-            return DatabaseService.make_request('GET', '/api/medical-records/', params=params)
+            response = DatabaseService.make_request('GET', '/api/medical-records/', params=params)
+            # Handle paginated response from database service
+            if isinstance(response, dict) and 'results' in response:
+                return response['results']
+            elif isinstance(response, list):
+                return response
+            else:
+                logger.warning(f"Unexpected response format from medical records: {type(response)}")
+                return []
         except Exception as e:
             logger.error(f"Failed to get medical records: {e}")
+            return []
+    
+    @staticmethod
+    def get_medical_record_types() -> List[Dict[str, Any]]:
+        """Get all active medical record types"""
+        try:
+            return DatabaseService.make_request('GET', '/api/medical-record-types/')
+        except Exception as e:
+            logger.error(f"Failed to get medical record types: {e}")
             return []
     
     @staticmethod

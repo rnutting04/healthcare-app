@@ -1,0 +1,235 @@
+/* Medical Records Page Styles */
+
+/* Remove default select arrow for custom styling */
+select {
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+    background-repeat: no-repeat;
+    background-position: right 0.5rem center;
+    background-size: 1.5em 1.5em;
+    padding-right: 2.5rem;
+}
+
+/* Record Cards */
+.record-card {
+    border-left: 4px solid transparent;
+    transition: all 0.3s ease;
+}
+
+.record-card:hover {
+    background-color: #f9fafb;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+/* Record Type Indicators */
+.record-type-lab {
+    border-left-color: #10b981;
+}
+
+.record-type-imaging {
+    border-left-color: #8b5cf6;
+}
+
+.record-type-consultation {
+    border-left-color: #f59e0b;
+}
+
+.record-type-prescription {
+    border-left-color: #3b82f6;
+}
+
+.record-type-pathology {
+    border-left-color: #ef4444;
+}
+
+/* Record Status Badges */
+.status-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.25rem 0.75rem;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.025em;
+}
+
+.status-new {
+    background-color: #dbeafe;
+    color: #1e40af;
+}
+
+.status-reviewed {
+    background-color: #d1fae5;
+    color: #065f46;
+}
+
+.status-pending {
+    background-color: #fed7aa;
+    color: #9a3412;
+}
+
+/* Loading Animation */
+@keyframes pulse {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.5;
+    }
+}
+
+.skeleton-loader {
+    background: linear-gradient(90deg, #f3f4f6 25%, #e5e7eb 50%, #f3f4f6 75%);
+    background-size: 200% 100%;
+    animation: loading 1.5s infinite;
+}
+
+@keyframes loading {
+    0% {
+        background-position: 200% 0;
+    }
+    100% {
+        background-position: -200% 0;
+    }
+}
+
+/* Modal Styles */
+.modal-backdrop {
+    backdrop-filter: blur(5px);
+}
+
+/* Record Detail Styles */
+.record-detail-section {
+    padding: 1rem 0;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.record-detail-section:last-child {
+    border-bottom: none;
+}
+
+.record-detail-label {
+    font-weight: 600;
+    color: #374151;
+    margin-bottom: 0.25rem;
+}
+
+.record-detail-value {
+    color: #6b7280;
+}
+
+/* Attachment Styles */
+.attachment-item {
+    display: flex;
+    align-items: center;
+    padding: 0.75rem;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.375rem;
+    margin-top: 0.5rem;
+    transition: background-color 0.2s;
+}
+
+.attachment-item:hover {
+    background-color: #f9fafb;
+}
+
+.attachment-icon {
+    width: 2rem;
+    height: 2rem;
+    margin-right: 0.75rem;
+    color: #6b7280;
+}
+
+/* Filter Badge */
+.filter-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.25rem 0.5rem;
+    background-color: #eff6ff;
+    color: #1e40af;
+    border-radius: 0.25rem;
+    font-size: 0.875rem;
+}
+
+.filter-badge button {
+    margin-left: 0.25rem;
+    padding: 0;
+    background: none;
+    border: none;
+    color: #1e40af;
+    cursor: pointer;
+}
+
+/* Print Styles */
+@media print {
+    .no-print {
+        display: none !important;
+    }
+    
+    .record-card {
+        page-break-inside: avoid;
+        border: 1px solid #d1d5db;
+        margin-bottom: 1rem;
+    }
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .record-card {
+        padding: 0.75rem;
+    }
+    
+    .filter-section {
+        flex-direction: column;
+    }
+    
+    .filter-section > div {
+        width: 100%;
+        margin-bottom: 1rem;
+    }
+}
+
+/* Accessibility */
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border-width: 0;
+}
+
+/* Focus Styles */
+button:focus,
+a:focus,
+input:focus,
+select:focus {
+    outline: 2px solid #3b82f6;
+    outline-offset: 2px;
+}
+
+/* Custom Scrollbar */
+.custom-scrollbar::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+    background: #f3f4f6;
+    border-radius: 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+    background: #9ca3af;
+    border-radius: 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: #6b7280;
+}
