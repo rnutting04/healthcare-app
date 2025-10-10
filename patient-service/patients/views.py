@@ -555,7 +555,6 @@ class ChatViewSet(viewsets.ViewSet):
             return Response({"error": "Authentication required"}, status=401)
 
         #Call RAG (LangChain) service
-        logger.info(patient)
         try:
             result = self.rag_service.query_with_context(
                 query=user_message,
@@ -614,7 +613,6 @@ class ChatViewSet(viewsets.ViewSet):
         """Get the current cancer type context for the patient"""
         try:
             patient = self.get_patient(request)
-            logger.info(patient)
             if not patient:
                 return Response(
                     {'error': 'Patient profile not found'}, 
@@ -646,7 +644,6 @@ class ChatViewSet(viewsets.ViewSet):
         sub_cancer_type = assignment['cancer_subtype_name']
         main_cancer_type = assignment['cancer_type_name']
         
-        logger.info(assignment)
         
         if not sub_cancer_type or not main_cancer_type:
             # Try to get from cancer_type_detail
