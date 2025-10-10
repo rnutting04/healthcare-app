@@ -5,7 +5,7 @@ from django.core.management.base import BaseCommand
 from django.db import transaction
 from django.utils import timezone
 
-from data_management.models import SuggestionTemplate 
+from data_management.models import SuggestionTemplate, CancerType
 
 class Command(BaseCommand):
     help = (
@@ -87,9 +87,14 @@ class Command(BaseCommand):
                 self.stdout.write(self.style.SUCCESS("Cleared existing suggestion templates"))
 
             for block in blocks:
-                cancer_type = (block.get("cancer_type") or "").strip().lower()
+                cancer_type = (block.get("cancer_type_name") or "").strip().lower()
                 questions = block.get("questions") or []
                 if not cancer_type or not questions:
+                    continue
+                try:
+                    cancer_type_obj = CancerType.objects.get(cancer_type__iexact=cancer_type, parent__isnull=True) # match top level cancer type
+                except CancerType.DoesNotExist:
+                    self.stdout.write(self.style.WARNING(f"No cancer type found for {cancer_type} - skipping"))
                     continue
 
                 # Compute embeddings in a batch if requested
@@ -110,7 +115,7 @@ class Command(BaseCommand):
                         defaults["embedding_json"] = json.dumps(embeddings[idx].tolist())
 
                     obj, made = SuggestionTemplate.objects.get_or_create(
-                        cancer_type=cancer_type,
+                        cancer_type=cancer_type_obj,
                         text=text,
                         defaults=defaults,
                     )

@@ -1,4 +1,4 @@
-[{"cancer_type": "uterine",
+[{"cancer_type": "Uterine Cancer",
  "questions": ["Can you explain the benefits and risks of this treatment?",
   "What are the potential side effects I should expect?",
   "Are there alternative treatment options available?",
@@ -51,7 +51,7 @@
   "What resources are available for caregivers?"]
 },
 {
-    "cancer_type": "breast",
+    "cancer_type": "Breast Cancer",
     "questions": [
       "What stage is my breast cancer and what does that mean?",
       "Are there genetic tests I should consider, like BRCA?",

@@ -617,6 +617,7 @@ class ChatViewSet(viewsets.ViewSet):
         """Get the current cancer type context for the patient"""
         try:
             patient = self.get_patient(request)
+            logger.info(patient)
             if not patient:
                 return Response(
                     {'error': 'Patient profile not found'}, 
@@ -644,7 +645,11 @@ class ChatViewSet(viewsets.ViewSet):
         """Extract cancer type from patient data with fallback"""
         # Try to get cancer type from patient profile
         assignment = patient.get('assignment')
-        cancer_type = assignment['cancer_subtype_name']
+        #sub_cancer_type = assignment['cancer_subtype_name']
+        #main_cancer_type = assignment['cancer_type_name']
+        
+        cancer_type = assignment['cancer_type_name']
+        logger.info(assignment)
         
         if not cancer_type:
             # Try to get from cancer_type_detail

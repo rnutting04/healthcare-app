@@ -450,9 +450,10 @@ class ChatMessage(models.Model):
 
 class SuggestionTemplate(models.Model):
     """Seeded catalog of suggestion questions, grouped by cancer type."""
-    cancer_type = models.CharField(max_length=64, db_index=True)
+    #cancer_type = models.CharField(max_length=64, db_index=True)
+    cancer_type = models.ForeignKey(CancerType, on_delete=models.CASCADE, db_column='cancer_type_id', related_name='suggestion_templates')
     text = models.TextField()
-    # Optional: keep room for a precomputed vector if you decide to store it later.
+
     embedding_json = models.JSONField(null=True, blank=True)
 
     class Meta:
