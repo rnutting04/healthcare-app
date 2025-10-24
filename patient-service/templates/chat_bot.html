@@ -121,11 +121,6 @@ const newChatButton = document.getElementById('new-chat-button');
 const suggestionContainer = document.getElementById('suggestion-container');
 const contextBadge = document.getElementById('chat-context-badge');
 const initialMessage = "Hello! I'm your medical assistant. I can help answer questions about your condition based on medical documents. How can I help you today?"
-const convo = [];  // [{role, content}, ...]
-const pushMsg = (role, content) => {
-  convo.push({ role, content });
-  if (convo.length > 20) convo.shift();   // keep it small
-};
 
 let token = localStorage.getItem('access_token');
 let sessionId = null;
@@ -133,6 +128,7 @@ let activeButton = null;
 let mainCancerType = null;
 let subCancerType = null;
 let preferredLanguage = null;
+let preferredInitialMessage = null;
 
 const TRANSLATE_URL = "/api/translate/";     // POST /translate/
 const RESULT_URL    = "/api/result";         // GET  /result/{id}
@@ -182,7 +178,6 @@ async function translateText(text, targetLang, token, {timeoutMs=10000, pollEver
     return text; // timeout fallback
   }
 
-  // Unknown / error
   return text;
 }
 
@@ -251,6 +246,7 @@ function renderSessionButton(session) {
         chatBox.innerHTML = ''
         sessionId = null
         translateText(initialMessage, preferredLanguage, token).then(translated => {
+            preferredInitialMessage = translated;
             appendMessage("assistant", translated);
         });
 
@@ -263,13 +259,12 @@ function renderSessionButton(session) {
 }
 
 function appendMessage(role, content) {
-  // OUTER ROW: controls left/right alignment and icon placement
+
   const msgWrapper = document.createElement('div');
   msgWrapper.className = `message-group mt-3 flex items-start gap-2 ${
     role === 'user' ? 'justify-end' : 'justify-start'
   }`;
 
-  // icon (unchanged)
   const icon = document.createElementNS("http://www.w3.org/2000/svg", "svg");
   icon.setAttribute("class", "h-5 w-5 " + (role === 'user' ? "text-blue-600" : "text-gray-600"));
   icon.setAttribute("viewBox", "0 0 24 24");
@@ -285,21 +280,18 @@ function appendMessage(role, content) {
     `;
   }
 
-  // CONTENT COLUMN: vertical stack -> bubble (and later) suggestions
   const contentCol = document.createElement('div');
   contentCol.className = `flex flex-col ${role === 'user' ? 'items-end' : 'items-start'} max-w-[75%]`;
 
-  // bubble
   const bubble = document.createElement('div');
   bubble.className = (role === 'user'
     ? 'bg-blue-600 text-white'
     : 'bg-gray-200 text-gray-800') + ' p-3 rounded-lg text-sm whitespace-pre-line';
-  // safer than innerHTML+replace (prevents XSS); preserves newlines with CSS
+
   bubble.textContent = content;
 
   contentCol.appendChild(bubble);
 
-  // assemble left/right
   if (role === 'user') {
     msgWrapper.appendChild(contentCol);
     msgWrapper.appendChild(icon);
@@ -308,11 +300,9 @@ function appendMessage(role, content) {
     msgWrapper.appendChild(contentCol);
   }
 
-  pushMsg(role, content);
   chatBox.appendChild(msgWrapper);
   scrollToBottom();
 
-  // IMPORTANT: return the vertical column so you can append suggestions under the bubble
   return contentCol;
 }
 
@@ -471,23 +461,26 @@ async function sendMessage(message) {
               </div>`;
             chatBox.appendChild(typingElement);
             scrollToBottom();
+            let send = {
+                message: message,
+                initial_message: preferredInitialMessage,
+                session_id: sessionId
+            };
             const res = await fetch("/api/patients/chat/message/", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
                     "Authorization": "Bearer " + token
                 },
-                body: JSON.stringify({
-                    message: message,
-                    session_id: sessionId
-                })
+                body: JSON.stringify(
+                    send
+                )
             });
             const data = await res.json();
             const bubbleEl = appendMessage("assistant", data.response || data.error);
             sessionId = data.session_id;
             try {
               // Build last 5 messages as "role: text" (user/assistant)
-              const last5 = convo.slice(-5).map(m => `${m.role}: ${m.content}`);
               const sres = await fetch("/api/suggest/", {
                 method: "POST",
                 headers: {  
@@ -533,6 +526,7 @@ document.addEventListener("DOMContentLoaded", async () =>{
         await loadSession(sessionId);
     } else {
         translateText(initialMessage, preferredLanguage, token).then(translated => {
+            preferredInitialMessage = translated;
             appendMessage("assistant", translated);
         });
     }
@@ -562,6 +556,7 @@ document.addEventListener("DOMContentLoaded", async () =>{
         chatBox.innerHTML = ''
         sessionId = null
         translateText(initialMessage, preferredLanguage, token).then(translated => {
+            preferredInitialMessage = translated;
             appendMessage("assistant", translated);
         });
     });

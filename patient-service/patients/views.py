@@ -515,8 +515,9 @@ class ChatViewSet(viewsets.ViewSet):
             session = DatabaseService.get_latest_chat_session(patient["id"])
             if not session:
                 session = DatabaseService.create_chat_session(patient["id"])
-                initialAssitantMessage = "Hello! I'm your medical assistant. I can help answer questions about your condition based on medical documents. How can I help you today?"
+                initialAssitantMessage = request.data.get("initial_message")
                 DatabaseService.create_chat_message(session["id"], "assistant",initialAssitantMessage)
+
                 
         messages = DatabaseService.get_messages_for_session(session["id"])
         chat_history = [{"role": "system", "content": (
@@ -553,12 +554,11 @@ class ChatViewSet(viewsets.ViewSet):
         auth_token = (request.META.get("HTTP_AUTHORIZATION", "") or "").replace("Bearer ", "")
         if not auth_token:
             return Response({"error": "Authentication required"}, status=401)
-
         #Call RAG (LangChain) service
         try:
             result = self.rag_service.query_with_context(
                 query=user_message,
-                language=patient.get("preferred_language_code", "en"),
+                language=patient.get("preferred_language_id", "en"),
                 cancer_type=main_cancer_type,
                 auth_token=auth_token,
                 session_id=session["id"],
@@ -622,6 +622,7 @@ class ChatViewSet(viewsets.ViewSet):
             main_cancer_type, sub_cancer_type = self._get_cancer_type(patient)
             
             preferred_language = patient.get('preferred_language', 'English')
+
             
             return Response({
                 'language': preferred_language,

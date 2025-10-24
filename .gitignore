@@ -30,11 +30,6 @@ db.sqlite3
 media/
 staticfiles/
 
-# Environment variables
-.env
-.env.local
-.env.*.local
-
 # IDEs
 .vscode/
 .idea/
