@@ -311,7 +311,7 @@ function connectToOCRWebSocket(fileId, jobId, websocketUrl) {
             
             // Populate results
             document.getElementById(`page-count-${fileId}`).textContent = `${result.page_count || 0} pages`;
-            document.getElementById(`confidence-${fileId}`).textContent = `${(result.confidence_score || 0).toFixed(1)}%`;
+            document.getElementById(`confidence-${fileId}`).textContent = `${(result.confidence_score * 100).toFixed(1)}%`;
             document.getElementById(`process-time-${fileId}`).textContent = `${(result.processing_time || 0).toFixed(1)} seconds`;
             
             // Show text preview (first 500 chars)
@@ -345,7 +345,7 @@ function downloadOCRResults(jobId, result) {
 ========================================
 Job ID: ${jobId}
 File: ${result.file_name || 'Unknown'}
-Confidence Score: ${(result.confidence_score || 0).toFixed(1)}
+Confidence Score: ${(result.confidence_score * 100).toFixed(1)}%
 Page Count: ${result.page_count || 0}
 Processing Time: ${(result.processing_time || 0).toFixed(1)} seconds
 Model Used: ${result.model_used || 'Unknown'}
